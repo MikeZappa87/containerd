@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
+	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -590,4 +591,27 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 		hostNet = config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
 	}
 	return hostNet
+}
+
+func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []cni.NetworkInterface {
+	var x []cni.NetworkInterface
+
+	if val, ok := config.Annotations["containerd.io/multi-network"]; ok {
+		for _, value := range strings.Split(val, ",") {
+			if strings.Contains(value, "@") {
+				a := strings.Split(value, "@")
+
+				x = append(x, cni.NetworkInterface{
+					NetworkName: a[0],
+					InterfaceName: a[1],
+				})
+			} else {
+				x = append(x, cni.NetworkInterface{
+					NetworkName: value,
+				})
+			}
+		}
+	}
+
+	return x
 }

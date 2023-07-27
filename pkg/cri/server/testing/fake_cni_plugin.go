@@ -67,3 +67,15 @@ func (f *FakeCNIPlugin) Load(opts ...cni.Opt) error {
 func (f *FakeCNIPlugin) GetConfig() *cni.ConfigResult {
 	return nil
 }
+
+func (f *FakeCNIPlugin) BuildCNINetworks(networkNames []cni.NetworkInterface ) []*cni.Network{
+	return nil 
+}
+
+func (f *FakeCNIPlugin) SetupWithNetworks(ctx context.Context, id string, path string, networks []*cni.Network, opts ...cni.NamespaceOpts) (*cni.Result, error) {
+	return nil, nil
+}
+
+func (f *FakeCNIPlugin)RemoveNetworks(ctx context.Context, id string, path string, networks []*cni.Network, opts ...cni.NamespaceOpts) error{
+	return nil
+}

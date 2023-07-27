@@ -135,6 +135,7 @@ type CniConfig struct {
 	// device is created as the net namespace is created, it's safe to run
 	// in parallel mode as the default setting.
 	NetworkPluginSetupSerially bool `toml:"setup_serially" json:"setupSerially"`
+	NetworkPluginMultiNetwork bool `toml:"multi_network" json:"multinetwork"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate cni config.
 	// When it is set, containerd will get cidr(s) from kubelet to replace {{.PodCIDR}},
 	// {{.PodCIDRRanges}} or {{.Routes}} in the template, and write the config into

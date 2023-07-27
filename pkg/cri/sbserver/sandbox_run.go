@@ -461,10 +461,19 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
-	if c.config.CniConfig.NetworkPluginSetupSerially {
-		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
+
+	x := c.extractNetworks(sandbox.Config)
+
+	networks := netPlugin.BuildCNINetworks(x)
+
+	if c.config.CniConfig.NetworkPluginMultiNetwork {
+		result, err = netPlugin.SetupWithNetworks(ctx, id, path, networks, opts...)
 	} else {
-		result, err = netPlugin.Setup(ctx, id, path, opts...)
+		if c.config.CniConfig.NetworkPluginSetupSerially {
+			result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
+		} else {
+			result, err = netPlugin.Setup(ctx, id, path, opts...)
+		}
 	}
 	networkPluginOperations.WithValues(networkSetUpOp).Inc()
 	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
@@ -482,6 +491,28 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	return fmt.Errorf("failed to find network info for sandbox %q", id)
 }
 
+func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []cni.NetworkInterface {
+	var x []cni.NetworkInterface
+
+	if val, ok := config.Annotations["containerd.io/multi-network"]; ok {
+		for _, value := range strings.Split(val, ",") {
+			if strings.Contains(value, "@") {
+				a := strings.Split(value, "@")
+
+				x = append(x, cni.NetworkInterface{
+					NetworkName: a[0],
+					InterfaceName: a[1],
+				})
+			} else {
+				x = append(x, cni.NetworkInterface{
+					NetworkName: value,
+				})
+			}
+		}
+	}
+
+	return x
+}
 // cniNamespaceOpts get CNI namespace options from sandbox config.
 func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.NamespaceOpts, error) {
 	opts := []cni.NamespaceOpts{

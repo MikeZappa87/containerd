@@ -35,6 +35,7 @@ type CNI interface {
 	Setup(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*Result, error)
 	// SetupSerially sets up each of the network interfaces for the namespace in serial
 	SetupSerially(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*Result, error)
+	SetupWithNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error)
 	// Remove tears down the network of the namespace.
 	Remove(ctx context.Context, id string, path string, opts ...NamespaceOpts) error
 	// Check checks if the network is still in desired state
@@ -45,6 +46,8 @@ type CNI interface {
 	Status() error
 	// GetConfig returns a copy of the CNI plugin configurations as parsed by CNI
 	GetConfig() *ConfigResult
+	BuildCNINetworks(networkNames []NetworkInterface ) []*Network
+	RemoveNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) error
 }
 
 type ConfigResult struct {
@@ -81,6 +84,11 @@ type libcni struct {
 	networkCount int // minimum network plugin configurations needed to initialize cni
 	networks     []*Network
 	sync.RWMutex
+}
+
+type NetworkInterface struct {
+	NetworkName string
+	InterfaceName string
 }
 
 func defaultCNIConfig() *libcni {
@@ -183,6 +191,46 @@ func (c *libcni) SetupSerially(ctx context.Context, id string, path string, opts
 	return c.createResult(result)
 }
 
+func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface ) []*Network {
+	var network []*Network
+
+	ifaceindex := 0
+	for _, net := range c.Networks() {
+		for _, x := range networkNames {
+			if net.config.Name == x.NetworkName {
+				if net.ifName == "lo" {
+				} else {
+					if x.InterfaceName == "" {
+						net.ifName = getIfName(c.prefix, ifaceindex)
+					} else {
+						net.ifName = x.InterfaceName
+					}
+				}
+				ifaceindex++
+				network = append(network, net)
+			}
+		}
+	}
+
+	return network
+}
+
+// SetupSerially setups specific networks in the namespace and returns a Result
+func (c *libcni) SetupWithNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error) {
+	if err := c.Status(); err != nil {
+		return nil, err
+	}
+	ns, err := newNamespace(id, path, opts...)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.attachNetworksSeriallyWithNetworks(ctx, ns, networks)
+	if err != nil {
+		return nil, err
+	}
+	return c.createResult(result)
+}
+
 func (c *libcni) attachNetworksSerially(ctx context.Context, ns *Namespace) ([]*types100.Result, error) {
 	var results []*types100.Result
 	for _, network := range c.Networks() {
@@ -192,6 +240,19 @@ func (c *libcni) attachNetworksSerially(ctx context.Context, ns *Namespace) ([]*
 		}
 		results = append(results, r)
 	}
+	return results, nil
+}
+
+func (c *libcni) attachNetworksSeriallyWithNetworks(ctx context.Context, ns *Namespace, networks []*Network) ([]*types100.Result, error) {
+	var results []*types100.Result
+	for _, network := range networks {
+			r, err := network.Attach(ctx, ns)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, r)
+		}
+		
 	return results, nil
 }
 
@@ -240,6 +301,33 @@ func (c *libcni) Remove(ctx context.Context, id string, path string, opts ...Nam
 		return err
 	}
 	for _, network := range c.Networks() {
+		if err := network.Remove(ctx, ns); err != nil {
+			// Based on CNI spec v0.7.0, empty network namespace is allowed to
+			// do best effort cleanup. However, it is not handled consistently
+			// right now:
+			// https://github.com/containernetworking/plugins/issues/210
+			// TODO(random-liu): Remove the error handling when the issue is
+			// fixed and the CNI spec v0.6.0 support is deprecated.
+			// NOTE(claudiub): Some CNIs could return a "not found" error, which could mean that
+			// it was already deleted.
+			if (path == "" && strings.Contains(err.Error(), "no such file or directory")) || strings.Contains(err.Error(), "not found") {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *libcni) RemoveNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) error {
+	if err := c.Status(); err != nil {
+		return err
+	}
+	ns, err := newNamespace(id, path, opts...)
+	if err != nil {
+		return err
+	}
+	for _, network := range c.networks {
 		if err := network.Remove(ctx, ns); err != nil {
 			// Based on CNI spec v0.7.0, empty network namespace is allowed to
 			// do best effort cleanup. However, it is not handled consistently
