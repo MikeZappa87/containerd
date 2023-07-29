@@ -61,6 +61,7 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
+			NetworkPluginMultiNetwork: false,
 		},
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter:        containerd.DefaultSnapshotter,

@@ -46,7 +46,7 @@ type CNI interface {
 	Status() error
 	// GetConfig returns a copy of the CNI plugin configurations as parsed by CNI
 	GetConfig() *ConfigResult
-	BuildCNINetworks(networkNames []NetworkInterface ) []*Network
+	BuildCNINetworks(networkNames []NetworkInterface) []*Network
 	RemoveNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) error
 }
 
@@ -87,7 +87,7 @@ type libcni struct {
 }
 
 type NetworkInterface struct {
-	NetworkName string
+	NetworkName   string
 	InterfaceName string
 }
 
@@ -191,13 +191,14 @@ func (c *libcni) SetupSerially(ctx context.Context, id string, path string, opts
 	return c.createResult(result)
 }
 
-func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface ) []*Network {
+func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface) []*Network {
 	var network []*Network
 
 	ifaceindex := 0
-	for _, net := range c.Networks() {
-		for _, x := range networkNames {
+	for _, x := range networkNames {
+		for _, net := range c.Networks() {
 			if net.config.Name == x.NetworkName {
+				//TODO - Get rid of the loopback plugin dependency and just exec into the netns and set lo up
 				if net.ifName == "lo" {
 				} else {
 					if x.InterfaceName == "" {
@@ -207,6 +208,7 @@ func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface ) []*Network {
 					}
 				}
 				ifaceindex++
+				//TODO - Add logic to make sure interface collisions don't happen. However that could be an implementation detail.
 				network = append(network, net)
 			}
 		}
@@ -246,13 +248,13 @@ func (c *libcni) attachNetworksSerially(ctx context.Context, ns *Namespace) ([]*
 func (c *libcni) attachNetworksSeriallyWithNetworks(ctx context.Context, ns *Namespace, networks []*Network) ([]*types100.Result, error) {
 	var results []*types100.Result
 	for _, network := range networks {
-			r, err := network.Attach(ctx, ns)
-			if err != nil {
-				return nil, err
-			}
-			results = append(results, r)
+		r, err := network.Attach(ctx, ns)
+		if err != nil {
+			return nil, err
 		}
-		
+		results = append(results, r)
+	}
+
 	return results, nil
 }
 
