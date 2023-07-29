@@ -195,18 +195,19 @@ func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface) []*Network {
 	var network []*Network
 
 	ifaceindex := 0
-	for _, x := range networkNames {
-		for _, net := range c.Networks() {
+	for _, net := range c.Networks() {
+		if net.ifName == "lo" || net.ifName == "eth0" {
+			network = append(network, net)
+			ifaceindex++
+			continue
+		}
+		for _, x := range networkNames {
 			if net.config.Name == x.NetworkName {
-				//TODO - Get rid of the loopback plugin dependency and just exec into the netns and set lo up
-				if net.ifName == "lo" {
-				} else {
 					if x.InterfaceName == "" {
 						net.ifName = getIfName(c.prefix, ifaceindex)
 					} else {
 						net.ifName = x.InterfaceName
 					}
-				}
 				ifaceindex++
 				//TODO - Add logic to make sure interface collisions don't happen. However that could be an implementation detail.
 				network = append(network, net)
