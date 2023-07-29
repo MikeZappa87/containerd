@@ -191,13 +191,13 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
 
-	x := c.extractNetworks(sandbox.Config)
-
-	networks := netPlugin.BuildCNINetworks(x)
-
 	netStart := time.Now()
 	if c.config.CniConfig.NetworkPluginMultiNetwork {
-		err = netPlugin.RemoveNetworks(ctx, id, path,networks, opts...)
+		x := c.extractNetworks(sandbox.Config)
+
+		networks := netPlugin.BuildCNINetworks(x)
+
+		err = netPlugin.RemoveNetworks(ctx, id, path, networks, opts...)
 	} else {
 		err = netPlugin.Remove(ctx, id, path, opts...)
 	}

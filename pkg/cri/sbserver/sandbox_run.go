@@ -462,11 +462,11 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
 
-	x := c.extractNetworks(sandbox.Config)
-
-	networks := netPlugin.BuildCNINetworks(x)
-
 	if c.config.CniConfig.NetworkPluginMultiNetwork {
+		x := c.extractNetworks(sandbox.Config)
+
+		networks := netPlugin.BuildCNINetworks(x)
+
 		result, err = netPlugin.SetupWithNetworks(ctx, id, path, networks, opts...)
 	} else {
 		if c.config.CniConfig.NetworkPluginSetupSerially {
@@ -500,7 +500,7 @@ func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []cni.Net
 				a := strings.Split(value, "@")
 
 				x = append(x, cni.NetworkInterface{
-					NetworkName: a[0],
+					NetworkName:   a[0],
 					InterfaceName: a[1],
 				})
 			} else {
@@ -513,6 +513,7 @@ func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []cni.Net
 
 	return x
 }
+
 // cniNamespaceOpts get CNI namespace options from sandbox config.
 func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.NamespaceOpts, error) {
 	opts := []cni.NamespaceOpts{
