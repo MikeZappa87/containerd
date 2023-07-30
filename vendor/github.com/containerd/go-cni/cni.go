@@ -203,11 +203,11 @@ func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface) []*Network {
 		}
 		for _, x := range networkNames {
 			if net.config.Name == x.NetworkName {
-					if x.InterfaceName == "" {
-						net.ifName = getIfName(c.prefix, ifaceindex)
-					} else {
-						net.ifName = x.InterfaceName
-					}
+				if x.InterfaceName == "" {
+					net.ifName = getIfName(c.prefix, ifaceindex)
+				} else {
+					net.ifName = x.InterfaceName
+				}
 				ifaceindex++
 				//TODO - Add logic to make sure interface collisions don't happen. However that could be an implementation detail.
 				network = append(network, net)
@@ -330,7 +330,7 @@ func (c *libcni) RemoveNetworks(ctx context.Context, id string, path string, net
 	if err != nil {
 		return err
 	}
-	for _, network := range c.networks {
+	for _, network := range networks {
 		if err := network.Remove(ctx, ns); err != nil {
 			// Based on CNI spec v0.7.0, empty network namespace is allowed to
 			// do best effort cleanup. However, it is not handled consistently
