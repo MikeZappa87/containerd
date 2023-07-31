@@ -330,8 +330,8 @@ func (c *libcni) RemoveNetworks(ctx context.Context, id string, path string, net
 	if err != nil {
 		return err
 	}
-	for _, network := range networks {
-		if err := network.Remove(ctx, ns); err != nil {
+	for i := len(networks)-1; i >= 0; i-- {
+		if err := networks[i].Remove(ctx, ns); err != nil {
 			// Based on CNI spec v0.7.0, empty network namespace is allowed to
 			// do best effort cleanup. However, it is not handled consistently
 			// right now:
