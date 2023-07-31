@@ -72,7 +72,7 @@ func (f *FakeCNIPlugin) BuildCNINetworks(networkNames []cni.NetworkInterface ) [
 	return nil 
 }
 
-func (f *FakeCNIPlugin) SetupWithNetworks(ctx context.Context, id string, path string, networks []*cni.Network, opts ...cni.NamespaceOpts) (*cni.Result, error) {
+func (f *FakeCNIPlugin) SetupNetworks(ctx context.Context, id string, path string, networks []*cni.Network, opts ...cni.NamespaceOpts) (*cni.Result, error) {
 	return nil, nil
 }
 

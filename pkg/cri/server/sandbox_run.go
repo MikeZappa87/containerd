@@ -552,7 +552,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 
 		networks := netPlugin.BuildCNINetworks(x)
 
-		result, err = netPlugin.SetupWithNetworks(ctx, id, path, networks, opts...)
+		result, err = netPlugin.SetupNetworks(ctx, id, path, networks, opts...)
 	} else {
 		if c.config.CniConfig.NetworkPluginSetupSerially {
 			result, err = netPlugin.SetupSerially(ctx, id, path, opts...)

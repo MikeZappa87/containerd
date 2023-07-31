@@ -35,7 +35,7 @@ type CNI interface {
 	Setup(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*Result, error)
 	// SetupSerially sets up each of the network interfaces for the namespace in serial
 	SetupSerially(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*Result, error)
-	SetupWithNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error)
+	SetupNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error)
 	// Remove tears down the network of the namespace.
 	Remove(ctx context.Context, id string, path string, opts ...NamespaceOpts) error
 	// Check checks if the network is still in desired state
@@ -219,7 +219,7 @@ func (c *libcni) BuildCNINetworks(networkNames []NetworkInterface) []*Network {
 }
 
 // SetupSerially setups specific networks in the namespace and returns a Result
-func (c *libcni) SetupWithNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error) {
+func (c *libcni) SetupNetworks(ctx context.Context, id string, path string, networks []*Network, opts ...NamespaceOpts) (*Result, error) {
 	if err := c.Status(); err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (c *libcni) SetupWithNetworks(ctx context.Context, id string, path string, 
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.attachNetworksSeriallyWithNetworks(ctx, ns, networks)
+	result, err := c.attachWithMultipleNetworksSerially(ctx, ns, networks)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ func (c *libcni) attachNetworksSerially(ctx context.Context, ns *Namespace) ([]*
 	return results, nil
 }
 
-func (c *libcni) attachNetworksSeriallyWithNetworks(ctx context.Context, ns *Namespace, networks []*Network) ([]*types100.Result, error) {
+func (c *libcni) attachWithMultipleNetworksSerially(ctx context.Context, ns *Namespace, networks []*Network) ([]*types100.Result, error) {
 	var results []*types100.Result
 	for _, network := range networks {
 		r, err := network.Attach(ctx, ns)
