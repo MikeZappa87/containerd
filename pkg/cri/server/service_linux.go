@@ -101,5 +101,9 @@ func (c *criService) initPlatform() (err error) {
 
 // cniLoadOptions returns cni load options for the linux.
 func (c *criService) cniLoadOptions() []cni.Opt {
-	return []cni.Opt{cni.WithLoNetwork, cni.WithAllConf}
+	if c.config.CniConfig.NetworkPluginMultiNetwork {
+		return []cni.Opt{cni.WithLoNetwork, cni.WithAllConf}
+	} else {
+		return []cni.Opt{cni.WithLoNetwork, cni.WithDefaultConf}
+	}
 }
