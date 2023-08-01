@@ -550,7 +550,9 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	if c.config.CniConfig.NetworkPluginMultiNetwork {
 		x := c.extractNetworks(sandbox.Config)
 
-		networks := netPlugin.BuildCNINetworks(x)
+		appendDefaultCNINetworks(x, netPlugin)
+
+		networks := netPlugin.BuildCNIMultiNetwork(x)
 
 		result, err = netPlugin.SetupNetworks(ctx, id, path, networks, opts...)
 	} else {

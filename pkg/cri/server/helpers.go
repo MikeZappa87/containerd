@@ -593,20 +593,33 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 	return hostNet
 }
 
-func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []cni.NetworkInterface {
-	var x []cni.NetworkInterface
+func appendDefaultCNINetworks(net []*cni.NetworkInterface, plugin cni.CNI) {
+	// Get first network name
+
+	net = append(net, &cni.NetworkInterface{
+		NetworkName:   "cni-loopback",
+		InterfaceName: "lo",
+	},
+		&cni.NetworkInterface{
+			InterfaceName: "eth0",
+			NetworkName:   plugin.GetConfig().Networks[0].Config.Name,
+		})
+}
+
+func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []*cni.NetworkInterface {
+	var x []*cni.NetworkInterface
 
 	if val, ok := config.Annotations["containerd.io/multi-network"]; ok {
 		for _, value := range strings.Split(val, ",") {
 			if strings.Contains(value, "@") {
 				a := strings.Split(value, "@")
 
-				x = append(x, cni.NetworkInterface{
-					NetworkName: a[0],
+				x = append(x, &cni.NetworkInterface{
+					NetworkName:   a[0],
 					InterfaceName: a[1],
 				})
 			} else {
-				x = append(x, cni.NetworkInterface{
+				x = append(x, &cni.NetworkInterface{
 					NetworkName: value,
 				})
 			}
