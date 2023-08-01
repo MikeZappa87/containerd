@@ -593,17 +593,15 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 	return hostNet
 }
 
-func appendDefaultCNINetworks(net []*cni.NetworkInterface, plugin cni.CNI) {
-	// Get first network name
-
-	net = append(net, &cni.NetworkInterface{
+func appendDefaultCNINetworks(net *[]*cni.NetworkInterface, plugin cni.CNI) {
+	*net = append(*net, &cni.NetworkInterface{
 		NetworkName:   "cni-loopback",
 		InterfaceName: "lo",
 	},
-		&cni.NetworkInterface{
+	&cni.NetworkInterface{
 			InterfaceName: "eth0",
-			NetworkName:   plugin.GetConfig().Networks[0].Config.Name,
-		})
+			NetworkName:   plugin.GetConfig().Networks[1].Config.Name,
+	})
 }
 
 func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []*cni.NetworkInterface {

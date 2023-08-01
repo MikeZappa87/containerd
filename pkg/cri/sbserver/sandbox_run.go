@@ -465,7 +465,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	if c.config.CniConfig.NetworkPluginMultiNetwork {
 		x := c.extractNetworks(sandbox.Config)
 
-		appendDefaultCNINetworks(x, netPlugin)
+		appendDefaultCNINetworks(&x, netPlugin)
 
 		networks := netPlugin.BuildCNIMultiNetwork(x)
 
@@ -516,10 +516,8 @@ func (c *criService) extractNetworks(config *runtime.PodSandboxConfig) []*cni.Ne
 	return x
 }
 
-func appendDefaultCNINetworks(net []*cni.NetworkInterface, plugin cni.CNI) {
-	// Get first network name
-
-	net = append(net, &cni.NetworkInterface{
+func appendDefaultCNINetworks(net *[]*cni.NetworkInterface, plugin cni.CNI) {
+	*net = append(*net, &cni.NetworkInterface{
 		NetworkName:   "cni-loopback",
 		InterfaceName: "lo",
 	},
