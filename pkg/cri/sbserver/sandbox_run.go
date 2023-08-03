@@ -467,7 +467,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 
 		appendDefaultCNINetworks(&x, netPlugin)
 
-		networks := netPlugin.BuildCNIMultiNetwork(x)
+		networks := netPlugin.BuildMultiNetwork(x)
 
 		result, err = netPlugin.SetupNetworks(ctx, id, path, networks, opts...)
 	} else {
@@ -484,11 +484,33 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return err
 	}
 	logDebugCNIResult(ctx, id, result)
-	// Check if the default interface has IP config
-	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
-		sandbox.CNIResult = result
+	if c.config.CniConfig.NetworkPluginMultiNetwork {
+		var ips []string
+
+		if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
+			sandbox.IP, _ = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
+			sandbox.CNIResult = result
+		}
+
+		for k, v := range result.Interfaces {
+			if v.Sandbox != "" && v.IPConfigs != nil && k != defaultIfName{
+				for _, ip := range v.IPConfigs {
+					if !ip.IP.IsLoopback() {
+						ips = append(ips, ip.IP.String())
+					}
+				}
+			}
+		}
+
+		sandbox.AdditionalIPs = ips
+
 		return nil
+	} else {
+		if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
+			sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
+			sandbox.CNIResult = result
+			return nil
+		}
 	}
 	return fmt.Errorf("failed to find network info for sandbox %q", id)
 }
@@ -523,7 +545,7 @@ func appendDefaultCNINetworks(net *[]*cni.NetworkInterface, plugin cni.CNI) {
 	},
 		&cni.NetworkInterface{
 			InterfaceName: "eth0",
-			NetworkName:   plugin.GetConfig().Networks[0].Config.Name,
+			NetworkName:   plugin.GetConfig().Networks[1].Config.Name,
 		})
 }
 

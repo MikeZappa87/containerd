@@ -68,7 +68,7 @@ func (f *FakeCNIPlugin) GetConfig() *cni.ConfigResult {
 	return nil
 }
 
-func (f *FakeCNIPlugin) BuildCNIMultiNetwork(networkNames []*cni.NetworkInterface) []*cni.Network {
+func (f *FakeCNIPlugin) BuildMultiNetwork(networkNames []*cni.NetworkInterface) []*cni.Network {
 	return nil
 }
 

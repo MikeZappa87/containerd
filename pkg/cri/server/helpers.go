@@ -600,6 +600,7 @@ func appendDefaultCNINetworks(net *[]*cni.NetworkInterface, plugin cni.CNI) {
 	},
 	&cni.NetworkInterface{
 			InterfaceName: "eth0",
+			//Index 0 and 1 should always be here
 			NetworkName:   plugin.GetConfig().Networks[1].Config.Name,
 	})
 }

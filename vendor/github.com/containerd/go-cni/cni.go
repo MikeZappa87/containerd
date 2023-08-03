@@ -49,8 +49,8 @@ type CNI interface {
 	Status() error
 	// GetConfig returns a copy of the CNI plugin configurations as parsed by CNI
 	GetConfig() *ConfigResult
-	//BuildCNIMultiNetwork returns a list of networks that match the network name in the cni cache
-	BuildCNIMultiNetwork(networkNames []*NetworkInterface) []*Network
+	//BuildMultiNetwork returns a list of networks that match the network name in the cni cache
+	BuildMultiNetwork(networkNames []*NetworkInterface) []*Network
 }
 
 type ConfigResult struct {
@@ -194,7 +194,8 @@ func (c *libcni) SetupSerially(ctx context.Context, id string, path string, opts
 	return c.createResult(result)
 }
 
-func (c *libcni) BuildCNIMultiNetwork(networkNames []*NetworkInterface) []*Network {
+// BuildMultiNetwork build dynamic list of Networks. Order Matters here!
+func (c *libcni) BuildMultiNetwork(networkNames []*NetworkInterface) []*Network {
 	var network []*Network
 	ifaceindex := 0
 	for _, net := range c.Networks() {
@@ -205,7 +206,11 @@ func (c *libcni) BuildCNIMultiNetwork(networkNames []*NetworkInterface) []*Netwo
 				} else {
 					net.ifName = x.InterfaceName
 				}
-				ifaceindex++
+				//Doing this to ensure first selected cni conf ifname is eth0
+				if net.ifName != "lo" {
+					ifaceindex++
+				}
+
 				//TODO - Add logic to make sure interface collisions don't happen. However that could be an implementation detail.
 				network = append(network, net)
 			}
@@ -232,15 +237,7 @@ func (c *libcni) SetupNetworks(ctx context.Context, id string, path string, netw
 }
 
 func (c *libcni) attachNetworksSerially(ctx context.Context, ns *Namespace) ([]*types100.Result, error) {
-	var results []*types100.Result
-	for _, network := range c.Networks() {
-		r, err := network.Attach(ctx, ns)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, r)
-	}
-	return results, nil
+	return c.attachWithMultipleNetworksSerially(ctx, ns, c.Networks())
 }
 
 func (c *libcni) attachWithMultipleNetworksSerially(ctx context.Context, ns *Namespace, networks []*Network) ([]*types100.Result, error) {
