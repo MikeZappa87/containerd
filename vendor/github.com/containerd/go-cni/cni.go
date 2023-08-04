@@ -50,7 +50,7 @@ type CNI interface {
 	// GetConfig returns a copy of the CNI plugin configurations as parsed by CNI
 	GetConfig() *ConfigResult
 	//BuildMultiNetwork returns a list of networks that match the network name in the cni cache
-	BuildMultiNetwork(networkNames []*NetworkInterface) []*Network
+	BuildMultiNetwork(networkNames []*NetworkInterface) ([]*Network, error)
 }
 
 type ConfigResult struct {
@@ -195,9 +195,13 @@ func (c *libcni) SetupSerially(ctx context.Context, id string, path string, opts
 }
 
 // BuildMultiNetwork build dynamic list of Networks. Order Matters here!
-func (c *libcni) BuildMultiNetwork(networkNames []*NetworkInterface) []*Network {
+func (c *libcni) BuildMultiNetwork(networkNames []*NetworkInterface) ([]*Network, error) {
 	var network []*Network
 	ifaceindex := 0
+
+	visited := make(map[*NetworkInterface]*Network)
+	visitedif := make(map[string]*Network)
+
 	for _, net := range c.Networks() {
 		for _, x := range networkNames {
 			if net.config.Name == x.NetworkName {
@@ -211,13 +215,29 @@ func (c *libcni) BuildMultiNetwork(networkNames []*NetworkInterface) []*Network 
 					ifaceindex++
 				}
 
-				//TODO - Add logic to make sure interface collisions don't happen. However that could be an implementation detail.
-				network = append(network, net)
+				if _, ok := visited[x]; !ok {
+					network = append(network, &Network{
+						cni: net.cni,
+						config: net.config,
+						ifName: net.ifName,
+					})
+					visited[x] = net
+				}
+
+				if _, ok := visitedif[net.ifName]; ok {
+					return nil, fmt.Errorf("the interface: %v already exists and must be unique", net.ifName)
+				} 
+
+				visitedif[net.ifName] = net
+
+				if len(visited) == len(networkNames) {
+					break
+				}
 			}
 		}
 	}
 
-	return network
+	return network, nil
 }
 
 // SetupSerially setups specific networks in the namespace and returns a Result

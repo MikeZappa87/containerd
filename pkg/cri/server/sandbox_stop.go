@@ -197,7 +197,11 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 
 		appendDefaultCNINetworks(&x, netPlugin)
 
-		networks := netPlugin.BuildMultiNetwork(x)
+		networks, err := netPlugin.BuildMultiNetwork(x)
+
+		if err != nil {
+			return err 
+		}
 
 		err = netPlugin.RemoveNetworks(ctx, id, path, networks, opts...)
 	} else {
