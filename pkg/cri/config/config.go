@@ -147,6 +147,8 @@ type CniConfig struct {
 	// NetworkPluginConfTemplate was once deprecated in containerd v1.7.0,
 	// but its deprecation was cancelled in v1.7.3.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
+	//TODO -- Actually fill this in
+	NetworkPluginUseBuildInLoopback bool `toml:"cniloopback" json:"cniloopback"`
 	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
 	//
 	// Options include:

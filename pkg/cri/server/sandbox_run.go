@@ -29,8 +29,10 @@ import (
 
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/davecgh/go-spew/spew"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -287,6 +289,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 
+		if c.config.NetworkPluginUseBuildInLoopback {
+			sandbox.NetNS.Do(func(nn ns.NetNS) error {
+				link, err := netlink.LinkByName("lo")
+
+				if err != nil {
+					return err
+				}
+
+				return netlink.LinkSetUp(link)
+			})
+		}
+
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done.
 			if retErr != nil && cleanupErr == nil {
@@ -408,6 +422,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			return nil, fmt.Errorf("failed to create pod sandbox %q: err is %v - status is %q and is expected %q", id, err, st.Status, containerd.Created)
 		}
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
+
+		if c.config.NetworkPluginUseBuildInLoopback {
+			sandbox.NetNS.Do(func(nn ns.NetNS) error {
+				link, err := netlink.LinkByName("lo")
+
+				if err != nil {
+					return err
+				}
+
+				return netlink.LinkSetUp(link)
+			})
+		}
 
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done.

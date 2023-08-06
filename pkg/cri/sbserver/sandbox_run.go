@@ -29,7 +29,9 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/hashicorp/go-multierror"
+	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -180,6 +182,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		// Update network namespace in the store, which is used to generate the container's spec
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
+
+		if c.config.NetworkPluginUseBuildInLoopback {
+			sandbox.NetNS.Do(func(nn ns.NetNS) error {
+				link, err := netlink.LinkByName("lo")
+
+				if err != nil {
+					return err
+				}
+
+				return netlink.LinkSetUp(link)
+			})
+		}
+
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done
 			if retErr != nil && cleanupErr == nil {
@@ -297,6 +312,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 		// Update network namespace in the store, which is used to generate the container's spec
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
+
+		if c.config.NetworkPluginUseBuildInLoopback {
+			sandbox.NetNS.Do(func(nn ns.NetNS) error {
+				link, err := netlink.LinkByName("lo")
+
+				if err != nil {
+					return err
+				}
+
+				return netlink.LinkSetUp(link)
+			})
+		}
+
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done
 			if retErr != nil && cleanupErr == nil {

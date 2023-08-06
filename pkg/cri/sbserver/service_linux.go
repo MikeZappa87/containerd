@@ -30,7 +30,7 @@ import (
 
 // networkAttachCount is the minimum number of networks the PodSandbox
 // attaches to
-const networkAttachCount = 2
+var networkAttachCount = 2
 
 // initPlatform handles linux specific initialization for the CRI service.
 func (c *criService) initPlatform() (err error) {
@@ -68,6 +68,13 @@ func (c *criService) initPlatform() (err error) {
 				max = m
 			}
 		}
+
+		if c.config.NetworkPluginUseBuildInLoopback {
+			networkAttachCount = 1
+		} else {
+			networkAttachCount = 2
+		}
+
 		// Pod needs to attach to at least loopback network and a non host network,
 		// hence networkAttachCount is 2. If there are more network configs the
 		// pod will be attached to all the networks but we will only use the ip
@@ -102,5 +109,9 @@ func (c *criService) initPlatform() (err error) {
 
 // cniLoadOptions returns cni load options for the linux.
 func (c *criService) cniLoadOptions() []cni.Opt {
+	if c.config.NetworkPluginUseBuildInLoopback {
+		return []cni.Opt{cni.WithDefaultConf}
+	}
+
 	return []cni.Opt{cni.WithLoNetwork, cni.WithDefaultConf}
 }
