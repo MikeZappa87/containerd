@@ -194,46 +194,41 @@ func (c *libcni) SetupSerially(ctx context.Context, id string, path string, opts
 	return c.createResult(result)
 }
 
-// BuildMultiNetwork build dynamic list of Networks. Order Matters here!
+// BuildMultiNetwork build dynamic list of Networks.
 func (c *libcni) BuildMultiNetwork(networkNames []*NetworkInterface) ([]*Network, error) {
 	var network []*Network
 	ifaceindex := 0
 
-	visited := make(map[*NetworkInterface]*Network)
-	visitedif := make(map[string]*Network)
+	config := make(map[string]*Network)
+	ifs := make(map[string]*Network)
 
-	for _, net := range c.Networks() {
-		for _, x := range networkNames {
-			if net.config.Name == x.NetworkName {
-				if x.InterfaceName == "" {
-					net.ifName = getIfName(c.prefix, ifaceindex)
-				} else {
-					net.ifName = x.InterfaceName
-				}
-				//Doing this to ensure first selected cni conf ifname is eth0
-				if net.ifName != "lo" {
-					ifaceindex++
-				}
+	for _, v := range c.Networks() {
+		config[v.config.Name] = v
+	}
 
-				if _, ok := visited[x]; !ok {
-					network = append(network, &Network{
-						cni: net.cni,
-						config: net.config,
-						ifName: net.ifName,
-					})
-					visited[x] = net
-				}
-
-				if _, ok := visitedif[net.ifName]; ok {
-					return nil, fmt.Errorf("the interface: %v already exists and must be unique", net.ifName)
-				} 
-
-				visitedif[net.ifName] = net
-
-				if len(visited) == len(networkNames) {
-					break
-				}
+	name := ""
+	for _, v := range networkNames {
+		if net, ok := config[v.NetworkName]; ok {
+			if v.InterfaceName == "" {
+				name = getIfName(c.prefix, ifaceindex)
+				ifaceindex++
+			} else {
+				name = v.InterfaceName
 			}
+
+			network = append(network, &Network{
+				cni:    net.cni,
+				config: net.config,
+				ifName: name,
+			})
+
+			if _, ok := ifs[name]; ok {
+				return nil, fmt.Errorf("the interface: %v already exists and must be unique", name)
+			}
+
+			ifs[name] = net
+		} else {
+			return nil, fmt.Errorf("the network config: %v does not exist", v.NetworkName)
 		}
 	}
 
