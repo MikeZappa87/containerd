@@ -68,6 +68,10 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		state = cstatus.State
 		createdAt = cstatus.CreatedAt
 		info = cstatus.Info
+
+		if !hostNetwork(sandbox.Config) {
+			info["netns"] = sandbox.NetNS.GetPath()
+		}
 	}
 
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip, additionalIPs)
