@@ -179,6 +179,7 @@ type CniConfig struct {
 	// * ipv6 - select the first ipv6 address
 	// * cni - use the order returned by the CNI plugins, returning the first IP address from the results
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
+	DisableCNI bool		`toml:"disable_cni" json:"disable_cni"`
 }
 
 // Mirror contains the config related to the registry mirror

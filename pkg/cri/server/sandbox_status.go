@@ -34,12 +34,18 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox: %w", err)
 	}
-
-	ip, additionalIPs, err := c.getIPs(sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
+	var ip string
+	var additionalIPs []string
+	if !c.config.CniConfig.DisableCNI {
+		ip, additionalIPs, err = c.getIPs(sandbox)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
+		}
+	} else {
+		ip = ""
+		additionalIPs = []string{}
 	}
-
+	
 	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
@@ -78,6 +84,10 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", sandbox.ID, err)
 		}
 		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
+	}
+
+	if !hostNetwork(sandbox.Config) {
+		status.Annotations["netns"] = sandbox.NetNS.GetPath()
 	}
 
 	return &runtime.PodSandboxStatusResponse{
