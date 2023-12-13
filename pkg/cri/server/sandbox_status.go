@@ -80,6 +80,10 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
 	}
 
+	if !hostNetwork(sandbox.Config) {
+		status.Annotations["netns"] = sandbox.NetNS.GetPath()
+	}
+
 	return &runtime.PodSandboxStatusResponse{
 		Status: status,
 		Info:   info,
