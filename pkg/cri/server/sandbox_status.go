@@ -34,12 +34,12 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox: %w", err)
 	}
-
+	/*
 	ip, additionalIPs, err := c.getIPs(sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
 	}
-
+	*/
 	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
@@ -70,7 +70,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		info = cstatus.Info
 	}
 
-	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip, additionalIPs)
+	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, "", nil)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
 		sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandbox.ID)

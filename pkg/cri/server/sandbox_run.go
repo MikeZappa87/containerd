@@ -449,6 +449,7 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 
 // setupPodNetwork setups up the network for a pod
 func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+	/*
 	var (
 		id        = sandbox.ID
 		config    = sandbox.Config
@@ -467,6 +468,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
+	
 	if c.config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
 	} else {
@@ -485,7 +487,9 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		sandbox.CNIResult = result
 		return nil
 	}
-	return fmt.Errorf("failed to find network info for sandbox %q", id)
+	*/
+	//return fmt.Errorf("failed to find network info for sandbox %q", id)
+	return nil
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.
