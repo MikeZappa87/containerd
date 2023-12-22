@@ -43,20 +43,28 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 	}
 	netPlugin := c.netPlugin[defaultNetworkPlugin]
 	// Check the status of the cni initialization
-	if netPlugin != nil {
-		if err := netPlugin.Status(); err != nil {
-			networkCondition.Status = false
-			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
-		}
-	}
 
-	resp := &runtime.StatusResponse{
-		Status: &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
+	resp := &runtime.StatusResponse{}
+
+	if !c.config.CniConfig.DisableCNI {
+		if netPlugin != nil {
+			if err := netPlugin.Status(); err != nil {
+				networkCondition.Status = false
+				networkCondition.Reason = networkNotReadyReason
+				networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			}
+		}
+
+		resp.Status = &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
 			runtimeCondition,
 			networkCondition,
-		}},
+		}}
+	} else {
+		resp.Status = &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
+			runtimeCondition,
+		}}
 	}
+	
 	if r.Verbose {
 		configByt, err := json.Marshal(c.config)
 		if err != nil {
