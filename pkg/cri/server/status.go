@@ -37,16 +37,18 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.RuntimeReady,
 		Status: true,
 	}
-	networkCondition := &runtime.RuntimeCondition{
-		Type:   runtime.NetworkReady,
-		Status: true,
-	}
+	
 	netPlugin := c.netPlugin[defaultNetworkPlugin]
 	// Check the status of the cni initialization
 
 	resp := &runtime.StatusResponse{}
 
 	if !c.config.CniConfig.DisableCNI {
+		networkCondition := &runtime.RuntimeCondition{
+			Type:   runtime.NetworkReady,
+			Status: true,
+		}
+
 		if netPlugin != nil {
 			if err := netPlugin.Status(); err != nil {
 				networkCondition.Status = false
