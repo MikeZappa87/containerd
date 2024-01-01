@@ -87,7 +87,11 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}
 
 	if !hostNetwork(sandbox.Config) {
-		status.Annotations["netns"] = sandbox.NetNS.GetPath()
+		if info == nil {
+			info = map[string]string{}
+		}
+
+		info["netns"] = sandbox.NetNS.GetPath()
 	}
 
 	return &runtime.PodSandboxStatusResponse{
