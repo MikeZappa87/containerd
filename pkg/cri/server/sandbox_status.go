@@ -92,6 +92,10 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		}
 
 		info["netns"] = sandbox.NetNS.GetPath()
+		
+		if cgroup := sandbox.Config.GetLinux().GetCgroupParent(); cgroup != "" {
+			info["cgroupPath"] = cgroup
+		}
 	}
 
 	return &runtime.PodSandboxStatusResponse{
