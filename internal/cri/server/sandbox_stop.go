@@ -87,7 +87,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	}
 
 	if c.config.DisableNetnsMgmt {
-		_, err := c.kniSvc.DeleteNetwork(ctx, &beta.DeleteNetworkRequest{})
+		_, err := c.kniSvc.DeleteNetwork(ctx, &beta.DeleteNetworkRequest{
+			Name:      sandbox.Name,
+			Id:        sandbox.ID,
+			NetnsPath: sandbox.NetNSPath,
+		})
 
 		if err != nil {
 			return nil
@@ -132,8 +136,13 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 // teardownPodNetwork removes the network from the pod
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	if c.config.CniConfig.Disabled {
-
-		_, err := c.kniSvc.DetachInterface(ctx, &beta.DetachInterfaceRequest{})
+		_, err := c.kniSvc.DetachInterface(ctx, &beta.DetachInterfaceRequest{
+			Name: sandbox.Name,
+			Id:   sandbox.ID,
+			Isolation: &beta.Isolation{
+				Path: sandbox.NetNSPath,
+			},
+		})
 
 		if err != nil {
 			return err

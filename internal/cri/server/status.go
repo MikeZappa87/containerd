@@ -23,7 +23,6 @@ import (
 	goruntime "runtime"
 
 	"github.com/containerd/containerd/v2/api/services/introspection/v1"
-	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -42,15 +41,6 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
-	// Check the status of the cni initialization
-	if netPlugin != nil {
-		if err := netPlugin.Status(); err != nil {
-			networkCondition.Status = false
-			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
-		}
-	}
 
 	resp := &runtime.StatusResponse{
 		Status: &runtime.RuntimeStatus{Conditions: []*runtime.RuntimeCondition{
@@ -59,6 +49,28 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		}},
 		RuntimeHandlers: c.runtimeHandlers,
 	}
+
+	if c.config.CniConfig.Disabled {
+		if !c.kniSvc.Up() {
+			networkCondition.Status = false
+			networkCondition.Reason = networkNotReadyReason
+			networkCondition.Message = "kni socket not found"
+		} else {
+			// TODO
+			// do some additional KNI calls to see if we are still good??
+		}
+	} else {
+		netPlugin := c.netPlugin[defaultNetworkPlugin]
+		// Check the status of the cni initialization
+		if netPlugin != nil {
+			if err := netPlugin.Status(); err != nil {
+				networkCondition.Status = false
+				networkCondition.Reason = networkNotReadyReason
+				networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			}
+		}
+	}
+
 	if r.Verbose {
 		configByt, err := json.Marshal(c.config)
 		if err != nil {
@@ -71,15 +83,15 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			return nil, err
 		}
 		resp.Info["golang"] = string(versionByt)
-
-		if netPlugin != nil {
-			cniConfig, err := json.Marshal(netPlugin.GetConfig())
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to marshal CNI config %v", err)
+		/*
+			if netPlugin != nil {
+				cniConfig, err := json.Marshal(netPlugin.GetConfig())
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to marshal CNI config %v", err)
+				}
+				resp.Info["cniconfig"] = string(cniConfig)
 			}
-			resp.Info["cniconfig"] = string(cniConfig)
-		}
-
+		*/
 		defaultStatus := "OK"
 		for name, h := range c.cniNetConfMonitor {
 			s := "OK"

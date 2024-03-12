@@ -97,13 +97,17 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		return "", nil, nil
 	}
 
-	if closed, err := sandbox.NetNS.Closed(); err != nil {
-		return "", nil, fmt.Errorf("check network namespace closed: %w", err)
-	} else if closed {
-		return "", nil, nil
-	}
+	if c.config.CniConfig.Disabled {
+		return sandbox.IP, sandbox.AdditionalIPs, nil
+	} else {
+		if closed, err := sandbox.NetNS.Closed(); err != nil {
+			return "", nil, fmt.Errorf("check network namespace closed: %w", err)
+		} else if closed {
+			return "", nil, nil
+		}
 
-	return sandbox.IP, sandbox.AdditionalIPs, nil
+		return sandbox.IP, sandbox.AdditionalIPs, nil
+	}
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
