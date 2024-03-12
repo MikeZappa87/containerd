@@ -57,11 +57,9 @@ func NewNetworkRuntimeService(endpoint string, connectionTimeout time.Duration) 
 		return nil, err
 	}
 
-	kni := KNINetworkService{
+	return &KNINetworkService{
 		beta.NewKNIClient(conn),
-	}
-
-	return &kni, nil
+	}, nil
 }
 
 func (m *KNINetworkService) AttachInterface(ctx context.Context, in *beta.AttachInterfaceRequest, opts ...grpc.CallOption) (*beta.AttachInterfaceResponse, error) {

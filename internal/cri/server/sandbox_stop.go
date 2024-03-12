@@ -139,9 +139,12 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 		_, err := c.kniSvc.DetachInterface(ctx, &beta.DetachInterfaceRequest{
 			Name: sandbox.Name,
 			Id:   sandbox.ID,
+			Namespace: sandbox.Config.Metadata.Namespace,
 			Isolation: &beta.Isolation{
 				Path: sandbox.NetNSPath,
 			},
+			Annotations: sandbox.Config.GetAnnotations(),
+			Labels: sandbox.Config.GetLabels(),
 		})
 
 		if err != nil {
