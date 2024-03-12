@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/MikeZappa87/kni-api/pkg/apis/runtime/beta"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -85,23 +86,31 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		log.G(ctx).WithError(err).Errorf("NRI sandbox stop notification failed")
 	}
 
-	// Teardown network for sandbox.
-	if sandbox.NetNS != nil {
-		netStop := time.Now()
-		// Use empty netns path if netns is not available. This is defined in:
-		// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
-		if closed, err := sandbox.NetNS.Closed(); err != nil {
-			return fmt.Errorf("failed to check network namespace closed: %w", err)
-		} else if closed {
-			sandbox.NetNSPath = ""
+	if c.config.DisableNetnsMgmt {
+		_, err := c.kniSvc.DeleteNetwork(ctx, &beta.DeleteNetworkRequest{})
+
+		if err != nil {
+			return nil
 		}
-		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-			return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
+	} else {
+		// Teardown network for sandbox.
+		if sandbox.NetNS != nil {
+			netStop := time.Now()
+			// Use empty netns path if netns is not available. This is defined in:
+			// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
+			if closed, err := sandbox.NetNS.Closed(); err != nil {
+				return fmt.Errorf("failed to check network namespace closed: %w", err)
+			} else if closed {
+				sandbox.NetNSPath = ""
+			}
+			if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+				return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
+			}
+			if err := sandbox.NetNS.Remove(); err != nil {
+				return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
+			}
+			sandboxDeleteNetwork.UpdateSince(netStop)
 		}
-		if err := sandbox.NetNS.Remove(); err != nil {
-			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
-		}
-		sandboxDeleteNetwork.UpdateSince(netStop)
 	}
 
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
@@ -122,6 +131,17 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 
 // teardownPodNetwork removes the network from the pod
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+	if c.config.CniConfig.Disabled {
+
+		_, err := c.kniSvc.DetachInterface(ctx, &beta.DetachInterfaceRequest{})
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")

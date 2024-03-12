@@ -176,6 +176,7 @@ type CniConfig struct {
 	// * ipv6 - select the first ipv6 address
 	// * cni - use the order returned by the CNI plugins, returning the first IP address from the results
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
+	Disabled     bool
 }
 
 // Mirror contains the config related to the registry mirror
@@ -398,6 +399,7 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+	DisableNetnsMgmt          bool
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

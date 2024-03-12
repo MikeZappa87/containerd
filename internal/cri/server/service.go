@@ -50,6 +50,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
+	"github.com/containerd/containerd/v2/internal/kni"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
@@ -155,6 +156,7 @@ type criService struct {
 	sandboxService sandboxService
 	// runtimeHandlers contains runtime handler info
 	runtimeHandlers []*runtime.RuntimeHandler
+	kniSvc          *kni.KNINetworkService
 }
 
 type CRIServiceOptions struct {
@@ -242,6 +244,14 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to introspect runtime handlers: %w", err)
 	}
+
+	kniSvc, err := kni.NewNetworkRuntimeService("/tmp/kni.sock", time.Second)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to kni socket")
+	}
+
+	c.kniSvc = kniSvc
 
 	return c, c, nil
 }

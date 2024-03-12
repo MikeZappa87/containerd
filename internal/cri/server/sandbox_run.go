@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MikeZappa87/kni-api/pkg/apis/runtime/beta"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -177,26 +178,37 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
 		// namespaces. If the pod is in host network namespace then both are empty and should not
 		// be used.
-		var netnsMountDir = "/var/run/netns"
-		if c.config.NetNSMountsUnderStateDir {
-			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
-		}
-		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
-		}
-		// Update network namespace in the store, which is used to generate the container's spec
-		sandbox.NetNSPath = sandbox.NetNS.GetPath()
-		defer func() {
-			// Remove the network namespace only if all the resource cleanup is done
-			if retErr != nil && cleanupErr == nil {
-				if cleanupErr = sandbox.NetNS.Remove(); cleanupErr != nil {
-					log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
-					return
-				}
-				sandbox.NetNSPath = ""
+
+		if c.config.DisableNetnsMgmt {
+			resp, err := c.kniSvc.CreateNetwork(ctx, &beta.CreateNetworkRequest{})
+
+			if err != nil {
+				return nil, err
 			}
-		}()
+
+			sandbox.NetNSPath = resp.NetnsPath
+		} else {
+			var netnsMountDir = "/var/run/netns"
+			if c.config.NetNSMountsUnderStateDir {
+				netnsMountDir = filepath.Join(c.config.StateDir, "netns")
+			}
+			sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
+			}
+			// Update network namespace in the store, which is used to generate the container's spec
+			sandbox.NetNSPath = sandbox.NetNS.GetPath()
+			defer func() {
+				// Remove the network namespace only if all the resource cleanup is done
+				if retErr != nil && cleanupErr == nil {
+					if cleanupErr = sandbox.NetNS.Remove(); cleanupErr != nil {
+						log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
+						return
+					}
+					sandbox.NetNSPath = ""
+				}
+			}()
+		}
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
@@ -433,6 +445,16 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 
 // setupPodNetwork setups up the network for a pod
 func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+	if c.config.CniConfig.Disabled {
+		_, err := c.kniSvc.AttachInterface(ctx, &beta.AttachInterfaceRequest{})
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 	var (
 		id        = sandbox.ID
 		config    = sandbox.Config

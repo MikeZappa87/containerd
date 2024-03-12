@@ -1,6 +1,6 @@
 module github.com/containerd/containerd/v2
 
-go 1.21
+go 1.21.5
 
 require (
 	dario.cat/mergo v1.0.0
@@ -8,6 +8,7 @@ require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/Microsoft/hcsshim v0.12.0
+	github.com/MikeZappa87/kni-api v0.0.8
 	github.com/checkpoint-restore/checkpointctl v1.1.0
 	github.com/checkpoint-restore/go-criu/v7 v7.0.0
 	github.com/containerd/btrfs/v2 v2.0.0
