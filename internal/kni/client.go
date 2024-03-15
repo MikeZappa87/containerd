@@ -17,6 +17,10 @@ type KNINetworkService struct {
 	beta.KNIClient
 }
 
+type KNIConfig struct {
+	SocketPath string
+}
+
 const (
 	// connection parameters
 	maxBackoffDelay      = 3 * time.Second

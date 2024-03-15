@@ -31,6 +31,7 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	"github.com/containerd/containerd/v2/internal/kni"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/plugins"
@@ -400,6 +401,8 @@ type RuntimeConfig struct {
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
 	DisableNetnsMgmt          bool
+
+	KNIConfiguration          kni.KNIConfig
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
