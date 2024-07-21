@@ -28,6 +28,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+const MaxFileSize = 2 * 1024 * 1024 // 2 Megabytes
+
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change
 // events.
 type cniNetConfSyncer struct {
@@ -135,6 +137,26 @@ func (syncer *cniNetConfSyncer) stop() error {
 }
 
 func isValidFile(filename string) bool {
+	file, err := os.Open(filename)
+
+	if err != nil {
+		log.L.WithError(err).Errorf("unable to open file: %s", filename)
+		return false
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+
+	if err != nil {
+		log.L.WithError(err).Errorf("unable to get file info of %s", filename)
+		return false
+	}
+
+	if fileInfo.Size() > MaxFileSize {
+		log.L.Warnf("CNI network configuration file %s exceeded max size of %d bytes", filename, MaxFileSize)
+		return false
+	}
+	
 	ext := strings.ToLower(filepath.Ext(filename))
 	return ext == ".conflist" || ext == ".json" || ext == ".conf"
 }
