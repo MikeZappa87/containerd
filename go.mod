@@ -151,3 +151,5 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v0.8.0 // indirect
 )
+
+replace github.com/containerd/go-cni v1.1.10 => github.com/mikezappa87/go-cni v1.1.1-0.20241123023724-91c449d82a11
