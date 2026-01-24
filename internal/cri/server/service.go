@@ -209,7 +209,6 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
 	}
-
 	// TODO: Make discard time configurable
 	c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](5*time.Minute, func(event *runtime.ContainerEventResponse) {
 		containerEventsDroppedCount.Inc()
@@ -233,19 +232,22 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.eventMonitor = events.NewEventMonitor(&criEventHandler{c: c})
 
 	c.cniNetConfMonitor = make(map[string]*cniNetConfSyncer)
-	for name, i := range c.netPlugin {
-		path := c.config.NetworkPluginConfDir
-		if name != defaultNetworkPlugin {
-			if rc, ok := c.config.Runtimes[name]; ok {
-				path = rc.NetworkPluginConfDir
+	// Skip CNI network conf syncer setup if CNI is disabled
+	if !c.config.DisableCNI {
+		for name, i := range c.netPlugin {
+			path := c.config.NetworkPluginConfDir
+			if name != defaultNetworkPlugin {
+				if rc, ok := c.config.Runtimes[name]; ok {
+					path = rc.NetworkPluginConfDir
+				}
 			}
-		}
-		if path != "" {
-			m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+			if path != "" {
+				m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+				}
+				c.cniNetConfMonitor[name] = m
 			}
-			c.cniNetConfMonitor[name] = m
 		}
 	}
 

@@ -45,13 +45,17 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
-	// Check the status of the cni initialization
-	if netPlugin != nil {
-		if err := netPlugin.Status(); err != nil {
-			networkCondition.Status = false
-			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+
+	if !c.config.CniConfig.DisableCNI {
+		// Fallback to CNI plugin status check
+		netPlugin := c.netPlugin[defaultNetworkPlugin]
+		// Check the status of the cni initialization
+		if netPlugin != nil {
+			if err := netPlugin.Status(); err != nil {
+				networkCondition.Status = false
+				networkCondition.Reason = networkNotReadyReason
+				networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			}
 		}
 	}
 
@@ -82,7 +86,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		}
 		resp.Info["golang"] = string(versionByt)
 
-		if netPlugin != nil {
+		if netPlugin := c.netPlugin[defaultNetworkPlugin]; netPlugin != nil {
 			cniConfig, err := json.Marshal(netPlugin.GetConfig())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to marshal CNI config %v", err)

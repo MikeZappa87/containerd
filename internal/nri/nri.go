@@ -60,6 +60,9 @@ type API interface {
 	// RemovePodSandbox relays pod removal events to NRI.
 	RemovePodSandbox(context.Context, PodSandbox) error
 
+	// PodSandboxStatus relays pod status request notifications to NRI.
+	PodSandboxStatus(context.Context, PodSandbox) (*nri.PodSandboxStatusResponse, error)
+
 	// CreateContainer relays container creation requests to NRI.
 	CreateContainer(context.Context, PodSandbox, Container) (*nri.ContainerAdjustment, error)
 
@@ -263,6 +266,29 @@ func (l *local) RemovePodSandbox(ctx context.Context, pod PodSandbox) error {
 	err := l.nri.RemovePodSandbox(ctx, request)
 	l.setState(pod.GetID(), Removed)
 	return err
+}
+
+func (l *local) PodSandboxStatus(ctx context.Context, pod PodSandbox) (*nri.PodSandboxStatusResponse, error) {
+	if !l.IsEnabled() {
+		log.G(ctx).Debug("NRI local adapter is disabled, returning nil from PodSandboxStatus")
+		return nil, nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.PodSandboxStatusRequest{
+		Pod: podSandboxToNRI(pod),
+	}
+
+	log.G(ctx).Debugf("NRI local adapter calling nri.PodSandboxStatus for pod %s", pod.GetID())
+	resp, err := l.nri.PodSandboxStatus(ctx, request)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI local adapter PodSandboxStatus failed for pod %s", pod.GetID())
+		return nil, err
+	}
+	log.G(ctx).Debugf("NRI local adapter PodSandboxStatus response for pod %s: ip=%q, additionalIPs=%v", pod.GetID(), resp.GetIp(), resp.GetAdditionalIps())
+	return resp, err
 }
 
 func (l *local) CreateContainer(ctx context.Context, pod PodSandbox, ctr Container) (*nri.ContainerAdjustment, error) {

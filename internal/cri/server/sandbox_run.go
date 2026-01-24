@@ -262,8 +262,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
+		//
+		// If CNI is disabled, skip CNI setup - networking is handled by the NRI driver.
+		// The IP addresses will be retrieved via the NRI PodSandboxStatus extension.
+		if !c.config.CniConfig.DisableCNI {
+			if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
+				return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
+			}
+		} else {
+			log.G(ctx).Infof("CNI is disabled, skipping CNI network setup for sandbox %q", id)
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 

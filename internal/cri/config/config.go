@@ -198,6 +198,8 @@ type CniConfig struct {
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
 	// UseInternalLoopback specifies if we use the CNI loopback plugin or internal mechanism to set lo to up
 	UseInternalLoopback bool `toml:"use_internal_loopback" json:"useInternalLoopback"`
+
+	DisableCNI bool `toml:"disable_cni" json:"disableCNI"`
 }
 
 // Mirror contains the config related to the registry mirror

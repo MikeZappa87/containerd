@@ -74,6 +74,14 @@ func (*API) RemovePodSandbox(context.Context, *sstore.Sandbox) error {
 	return nil
 }
 
+func (*API) PodSandboxStatus(context.Context, *sstore.Sandbox) (*api.PodSandboxStatusResponse, error) {
+	return nil, nil
+}
+
+func (*API) CreateContainer(context.Context, *containers.Container, *specs.Spec) (*api.ContainerAdjustment, error) {
+	return nil, nil
+}
+
 func (*API) PostCreateContainer(context.Context, *sstore.Sandbox, *cstore.Container) error {
 	return nil
 }

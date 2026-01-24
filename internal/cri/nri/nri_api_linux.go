@@ -143,6 +143,24 @@ func (a *API) RemovePodSandbox(ctx context.Context, criPod *sstore.Sandbox) erro
 	return err
 }
 
+func (a *API) PodSandboxStatus(ctx context.Context, criPod *sstore.Sandbox) (*api.PodSandboxStatusResponse, error) {
+	if a.IsDisabled() {
+		log.G(ctx).Debug("NRI is disabled, returning nil from PodSandboxStatus")
+		return nil, nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+
+	log.G(ctx).Debugf("Calling NRI PodSandboxStatus for pod %s", pod.GetID())
+	resp, err := a.nri.PodSandboxStatus(ctx, pod)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI PodSandboxStatus failed for pod %s", pod.GetID())
+		return nil, err
+	}
+	log.G(ctx).Debugf("NRI PodSandboxStatus response for pod %s: ip=%q, additionalIPs=%v", pod.GetID(), resp.GetIp(), resp.GetAdditionalIps())
+	return resp, nil
+}
+
 func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *runtimespec.Spec) (*api.ContainerAdjustment, error) {
 	ctr := a.nriContainer(ctrs, withContainerSpec(spec))
 

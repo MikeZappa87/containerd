@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -36,7 +37,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		return nil, fmt.Errorf("an error occurred when try to find sandbox: %w", err)
 	}
 
-	ip, additionalIPs, err := c.getIPs(sandbox)
+	ip, additionalIPs, err := c.getIPsWithContext(ctx, sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
 	}
@@ -95,7 +96,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}, nil
 }
 
-func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, error) {
+func (c *criService) getIPsWithContext(ctx context.Context, sandbox sandboxstore.Sandbox) (string, []string, error) {
 	config := sandbox.Config
 
 	// For sandboxes using the node network we are not
@@ -110,7 +111,34 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		return "", nil, nil
 	}
 
-	return sandbox.IP, sandbox.AdditionalIPs, nil
+	if !c.config.DisableCNI {
+		return sandbox.IP, sandbox.AdditionalIPs, nil
+	}
+
+	log.G(ctx).Debugf("DisableCNI is true, calling NRI PodSandboxStatus for sandbox %s", sandbox.ID)
+
+	resp, err := c.nri.PodSandboxStatus(ctx, &sandbox)
+	if err != nil {
+		return "", nil, fmt.Errorf("NRI PodSandboxStatus failed: %w", err)
+	}
+
+	log.G(ctx).Debugf("NRI PodSandboxStatus response for sandbox %s: resp=%+v", sandbox.ID, resp)
+
+	// Use IPs from NRI response if provided, otherwise fall back to sandbox values
+	ip := sandbox.IP
+	additionalIPs := sandbox.AdditionalIPs
+	if resp != nil {
+		if resp.Ip != "" {
+			ip = resp.Ip
+		}
+		if len(resp.AdditionalIps) > 0 {
+			additionalIPs = resp.AdditionalIps
+		}
+	}
+
+	log.G(ctx).Debugf("getIPsWithContext returning ip=%q, additionalIPs=%v for sandbox %s", ip, additionalIPs, sandbox.ID)
+
+	return ip, additionalIPs, nil
 }
 
 // setUpdatedResources sets updated pod sandbox resources in the sandbox info.
