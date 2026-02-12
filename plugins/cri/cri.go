@@ -143,6 +143,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		ImageServiceServer:   is,
 		Closer:               s, // TODO: Where is close run?
 		initializer:          s,
+		podResourcesProvider: rs.(server.PodResourcesProvider),
 	}
 
 	if config.DisableTCPService {
@@ -165,6 +166,12 @@ type criGRPCServer struct {
 	runtime.ImageServiceServer
 	io.Closer
 	initializer
+	podResourcesProvider server.PodResourcesProvider
+}
+
+// PodResources returns the PodResourcesProvider backed by the CRI service.
+func (c *criGRPCServer) PodResources() server.PodResourcesProvider {
+	return c.podResourcesProvider
 }
 
 func (c *criGRPCServer) register(s *grpc.Server) error {
