@@ -159,7 +159,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 		State:     state,
 		CreatedAt: createdAt.UnixNano(),
 		Network: &runtime.PodSandboxNetworkStatus{
-			Ip:            ip,
+			Ip:            "broken",
 			AdditionalIps: ips,
 		},
 		Linux: &runtime.LinuxPodSandboxStatus{
