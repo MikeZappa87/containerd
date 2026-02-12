@@ -19,6 +19,9 @@ package pod
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 
@@ -32,14 +35,36 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 )
 
+// Config holds the configuration for the Pod gRPC service plugin.
+type Config struct {
+	// Address is the unix socket address for a dedicated Pod API listener.
+	// When empty (default), the Pod service is registered on the main
+	// containerd gRPC socket. When set (e.g. "/run/k8s/pod.sock"),
+	// a standalone gRPC server is started on that socket instead.
+	Address string `toml:"address" json:"address"`
+
+	// UID is the unix socket owner user id when using a dedicated address.
+	UID int `toml:"uid" json:"uid"`
+
+	// GID is the unix socket owner group id when using a dedicated address.
+	GID int `toml:"gid" json:"gid"`
+}
+
 func init() {
+	defaultConfig := Config{
+		Address: "/run/k8s/pod.sock",
+	}
+
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "pod",
 		Requires: []plugin.Type{
 			plugins.GRPCPlugin,
 		},
+		Config: &defaultConfig,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			config := ic.Config.(*Config)
+
 			criPlugin, err := ic.GetByID(plugins.GRPCPlugin, "cri")
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI gRPC plugin: %w", err)
@@ -54,7 +79,19 @@ func init() {
 				return nil, fmt.Errorf("CRI gRPC plugin does not expose PodResourcesProvider")
 			}
 
-			return &podService{provider: exposer.PodResources()}, nil
+			svc := &podService{provider: exposer.PodResources()}
+
+			// When an explicit address is configured, start a dedicated
+			// gRPC server on that socket instead of registering on the
+			// main containerd socket.
+			if config.Address != "" {
+				if err := svc.startDedicatedServer(ic.Context, config); err != nil {
+					return nil, fmt.Errorf("failed to start dedicated pod gRPC server: %w", err)
+				}
+				log.G(ic.Context).WithField("address", config.Address).Info("pod gRPC service listening on dedicated socket")
+			}
+
+			return svc, nil
 		},
 	})
 }
@@ -62,13 +99,80 @@ func init() {
 type podService struct {
 	provider server.PodResourcesProvider
 	api.UnimplementedPodServer
+
+	// dedicated is non-nil when the plugin runs its own gRPC server.
+	dedicated *grpc.Server
+	listener  net.Listener
 }
 
 var _ api.PodServer = (*podService)(nil)
 
-// Register registers the Pod gRPC service with the server.
-func (s *podService) Register(server *grpc.Server) error {
-	api.RegisterPodServer(server, s)
+// Register registers the Pod gRPC service with the shared containerd
+// gRPC server. It is a no-op when a dedicated address is configured
+// (the service is already running on its own socket).
+func (s *podService) Register(srv *grpc.Server) error {
+	if s.dedicated != nil {
+		// Already running on a dedicated socket; skip shared registration.
+		return nil
+	}
+	api.RegisterPodServer(srv, s)
+	return nil
+}
+
+// Close shuts down the dedicated gRPC server, if one was started.
+func (s *podService) Close() error {
+	if s.dedicated != nil {
+		s.dedicated.GracefulStop()
+	}
+	if s.listener != nil {
+		return s.listener.Close()
+	}
+	return nil
+}
+
+// startDedicatedServer creates a unix socket at config.Address and starts
+// serving the Pod gRPC service in a background goroutine.
+func (s *podService) startDedicatedServer(ctx context.Context, config *Config) error {
+	addr := config.Address
+
+	// Ensure the parent directory exists.
+	dir := filepath.Dir(addr)
+	if err := os.MkdirAll(dir, 0o770); err != nil {
+		return fmt.Errorf("failed to create socket directory %s: %w", dir, err)
+	}
+
+	// Remove stale socket if present.
+	if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove existing socket %s: %w", addr, err)
+	}
+
+	l, err := net.Listen("unix", addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+
+	// Apply permissions.
+	if err := os.Chmod(addr, 0o660); err != nil {
+		l.Close()
+		return fmt.Errorf("failed to chmod socket %s: %w", addr, err)
+	}
+	if err := os.Chown(addr, config.UID, config.GID); err != nil {
+		l.Close()
+		return fmt.Errorf("failed to chown socket %s: %w", addr, err)
+	}
+
+	srv := grpc.NewServer()
+	api.RegisterPodServer(srv, s)
+
+	s.dedicated = srv
+	s.listener = l
+
+	go func() {
+		if err := srv.Serve(l); err != nil {
+			log.G(ctx).WithError(err).WithField("address", addr).Error("pod dedicated gRPC server exited")
+		}
+	}()
+
 	return nil
 }
 

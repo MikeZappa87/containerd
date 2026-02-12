@@ -20,6 +20,7 @@ package integration
 
 import (
 	"context"
+	"flag"
 	"os"
 	"testing"
 
@@ -33,17 +34,28 @@ import (
 	dialer "github.com/containerd/containerd/v2/integration/remote/util"
 )
 
-// newPodClient creates a Pod gRPC client connected to the containerd endpoint.
+// podEndpoint allows tests to connect to a dedicated Pod gRPC socket.
+// When empty, the tests connect to the main containerd (CRI) endpoint.
+var podEndpoint = flag.String("pod-endpoint", "", "Optional dedicated Pod gRPC endpoint (e.g. unix:///run/k8s/pod.sock). Defaults to the CRI endpoint.")
+
+// newPodClient creates a Pod gRPC client connected to either the dedicated
+// pod endpoint (if configured) or the main containerd endpoint.
 func newPodClient(t *testing.T) podapi.PodClient {
 	t.Helper()
-	addr, d, err := dialer.GetAddressAndDialer(*criEndpoint)
-	require.NoError(t, err, "get dialer for endpoint %s", *criEndpoint)
+
+	endpoint := *criEndpoint
+	if *podEndpoint != "" {
+		endpoint = *podEndpoint
+	}
+
+	addr, d, err := dialer.GetAddressAndDialer(endpoint)
+	require.NoError(t, err, "get dialer for endpoint %s", endpoint)
 
 	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(d),
 	)
-	require.NoError(t, err, "dial containerd gRPC endpoint")
+	require.NoError(t, err, "dial Pod gRPC endpoint %s", endpoint)
 	t.Cleanup(func() { conn.Close() })
 
 	return podapi.NewPodClient(conn)
