@@ -88,6 +88,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
 			UseInternalLoopback:        false,
+			DisableCNI:                 true,
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runc",

@@ -104,13 +104,43 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		return "", nil, nil
 	}
 
+	// Get all containers that belong to this sandbox
+	containers := c.containerStore.List()
+	ips := []string{}
+	for _, container := range containers {
+		if container.SandboxID == sandbox.ID {
+
+			// Access the container's network namespace
+			if container.NetNS != nil {
+				netnsPath := container.NetNS.GetPath()
+				_ = netnsPath // Use netnsPath as needed
+
+				cips, err := getIPStringsFromNetNS(container.NetNS, "eth0")
+				if err != nil {
+					return "", nil, fmt.Errorf("failed to get IPs from container %q netns: %w", container.ID, err)
+				}
+				ips = append(ips, cips...)
+			}
+		}
+	}
+
 	if closed, err := sandbox.NetNS.Closed(); err != nil {
 		return "", nil, fmt.Errorf("check network namespace closed: %w", err)
 	} else if closed {
 		return "", nil, nil
 	}
 
-	return sandbox.IP, sandbox.AdditionalIPs, nil
+	if len(ips) == 0 {
+		return "", nil, fmt.Errorf("unable to retrieve pod ip addresses")
+	}
+
+	// First IP is the primary, rest are additional
+	var additionalIPs []string
+	if len(ips) > 1 {
+		additionalIPs = ips[1:]
+	}
+
+	return ips[0], additionalIPs, nil
 }
 
 // setUpdatedResources sets updated pod sandbox resources in the sandbox info.

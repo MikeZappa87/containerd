@@ -114,7 +114,8 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		} else if closed {
 			sandbox.NetNSPath = ""
 		}
-		if sandbox.CNIResult != nil {
+		// Skip CNI teardown if CNI is disabled.
+		if !c.config.DisableCNI && sandbox.CNIResult != nil {
 			if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
 				return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 			}

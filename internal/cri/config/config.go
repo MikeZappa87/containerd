@@ -153,6 +153,10 @@ type ContainerdConfig struct {
 
 // CniConfig contains toml config related to cni
 type CniConfig struct {
+	// DisableCNI disables the CNI plugin. When set to true, the CRI plugin will not
+	// setup or teardown the pod network using CNI. This is useful when using alternative
+	// network solutions that do not require CNI.
+	DisableCNI bool `toml:"disable_cni" json:"disableCNI"`
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	//
 	// DEPRECATED: use `NetworkPluginBinDirs` instead.`

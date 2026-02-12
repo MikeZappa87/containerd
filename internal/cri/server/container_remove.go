@@ -103,6 +103,13 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
+	// Remove the container's network namespace if it has one.
+	if container.NetNS != nil {
+		if err := container.NetNS.Remove(); err != nil {
+			return nil, fmt.Errorf("failed to remove network namespace for container %q: %w", id, err)
+		}
+	}
+
 	// Delete containerd container.
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {

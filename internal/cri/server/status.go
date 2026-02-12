@@ -26,6 +26,7 @@ import (
 	"sort"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -45,13 +46,17 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
-	// Check the status of the cni initialization
-	if netPlugin != nil {
-		if err := netPlugin.Status(); err != nil {
-			networkCondition.Status = false
-			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+	// Skip CNI status check if CNI is disabled
+	var netPlugin cni.CNI
+	if !c.config.DisableCNI {
+		netPlugin = c.netPlugin[defaultNetworkPlugin]
+		// Check the status of the cni initialization
+		if netPlugin != nil {
+			if err := netPlugin.Status(); err != nil {
+				networkCondition.Status = false
+				networkCondition.Reason = networkNotReadyReason
+				networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			}
 		}
 	}
 

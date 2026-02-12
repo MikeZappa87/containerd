@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/internal/truncindex"
+	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/errdefs"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -49,6 +50,8 @@ type Container struct {
 	IsStopSignaledWithTimeout *uint32
 	// Stats contains (mutable) stats for the container
 	Stats *stats.ContainerStats
+	// NetNS is the network namespace for the container (when using per-container netns)
+	NetNS *netns.NetNS
 }
 
 // Opts sets specific information to newly created Container.
@@ -66,6 +69,14 @@ func WithContainer(cntr containerd.Container) Opts {
 func WithContainerIO(io *cio.ContainerIO) Opts {
 	return func(c *Container) error {
 		c.IO = io
+		return nil
+	}
+}
+
+// WithNetNS adds network namespace into the container.
+func WithNetNS(ns *netns.NetNS) Opts {
+	return func(c *Container) error {
+		c.NetNS = ns
 		return nil
 	}
 }

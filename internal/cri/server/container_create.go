@@ -47,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -304,12 +305,17 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		imageName = name
 	}
 
+	cnetns, err := netns.NewNetNS("/var/run/netns/" + fmt.Sprintf("%s-%s", r.podSandboxConfig.Metadata.Namespace, r.containerName))
+	if err != nil {
+		return "", fmt.Errorf("failed to create new network namespace: %w", err)
+	}
+
 	spec, err := c.buildContainerSpec(
 		platform,
 		r.containerID,
 		r.sandboxID,
 		r.sandboxPid,
-		r.NetNSPath,
+		cnetns.GetPath(),
 		r.containerName,
 		imageName,
 		r.containerConfig,
@@ -452,6 +458,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		containerstore.WithStatus(status, containerRootDir),
 		containerstore.WithContainer(cntr),
 		containerstore.WithContainerIO(containerIO),
+		containerstore.WithNetNS(cnetns),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create internal container object for %q: %w", r.containerID, err)

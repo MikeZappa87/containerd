@@ -242,6 +242,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 				deferCtx, deferCancel := util.DeferContext()
 				defer deferCancel()
 				// Teardown network if an error is returned.
+				// Skip CNI teardown if CNI is disabled.
+				if c.config.DisableCNI {
+					return
+				}
 				if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
 					log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
 
@@ -262,10 +266,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
+		// Skip CNI setup if CNI is disabled.
+		if !c.config.DisableCNI {
+			if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
+				return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
+			}
+			sandboxCreateNetworkTimer.UpdateSince(netStart)
 		}
-		sandboxCreateNetworkTimer.UpdateSince(netStart)
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
