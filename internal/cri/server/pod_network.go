@@ -503,3 +503,502 @@ func rdmaToNetDev(rdmaDevice string) (string, error) {
 	}
 	return "", fmt.Errorf("no net device found for RDMA device %s", rdmaDevice)
 }
+
+// CreateNetdev creates a new Linux network device inside the pod's network namespace.
+func (c *criService) CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	sb, err := c.sandboxStore.Get(req.SandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandbox %q: %w", req.SandboxID, err)
+	}
+	if sb.NetNSPath == "" {
+		return nil, fmt.Errorf("sandbox %q has no network namespace", req.SandboxID)
+	}
+
+	return createNetdev(sb.NetNSPath, req)
+}
+
+// createNetdev performs the actual netlink device creation inside the given netns.
+func createNetdev(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("device name is required")
+	}
+
+	switch {
+	case req.Veth != nil:
+		return createVethDevice(netnsPath, req)
+	case req.Vxlan != nil:
+		return createVxlanDevice(netnsPath, req)
+	case req.Dummy != nil:
+		return createDummyDevice(netnsPath, req)
+	case req.IPVlan != nil:
+		return createIPVlanDevice(netnsPath, req)
+	case req.Macvlan != nil:
+		return createMacvlanDevice(netnsPath, req)
+	default:
+		return nil, fmt.Errorf("exactly one device config must be specified")
+	}
+}
+
+// createVethDevice creates a veth pair with one end in the pod netns.
+func createVethDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	cfg := req.Veth
+	if cfg.PeerName == "" {
+		return nil, fmt.Errorf("veth peer_name is required")
+	}
+
+	result := &pod.CreateNetdevResult{}
+
+	// Open the target netns fd.
+	targetNS, err := netns.GetFromPath(netnsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open target netns %s: %w", netnsPath, err)
+	}
+	defer targetNS.Close()
+
+	// Create the veth pair in the root namespace.
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: req.Name,
+			MTU:  int(req.MTU),
+		},
+		PeerName: cfg.PeerName,
+	}
+	if req.MTU > 0 {
+		veth.LinkAttrs.MTU = int(req.MTU)
+	}
+
+	if err := netlink.LinkAdd(veth); err != nil {
+		return nil, fmt.Errorf("failed to create veth pair (%s, %s): %w", req.Name, cfg.PeerName, err)
+	}
+
+	// Move the pod end into the target netns.
+	podLink, err := netlink.LinkByName(req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find veth %s: %w", req.Name, err)
+	}
+	if err := netlink.LinkSetNsFd(podLink, int(targetNS)); err != nil {
+		// Clean up on failure.
+		_ = netlink.LinkDel(podLink)
+		return nil, fmt.Errorf("failed to move veth %s to pod netns: %w", req.Name, err)
+	}
+
+	// Configure the pod end inside the target netns.
+	err = cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("veth %s not found in pod netns: %w", req.Name, err)
+		}
+
+		// Assign addresses.
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// If a peer netns is specified, move the peer there; otherwise leave in root ns.
+	peerLink, err := netlink.LinkByName(cfg.PeerName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find peer veth %s: %w", cfg.PeerName, err)
+	}
+
+	if cfg.PeerNetNSPath != "" {
+		peerNS, err := netns.GetFromPath(cfg.PeerNetNSPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open peer netns %s: %w", cfg.PeerNetNSPath, err)
+		}
+		defer peerNS.Close()
+		if err := netlink.LinkSetNsFd(peerLink, int(peerNS)); err != nil {
+			return nil, fmt.Errorf("failed to move peer veth %s: %w", cfg.PeerName, err)
+		}
+		// Read peer info from its new namespace.
+		err = cnins.WithNetNSPath(cfg.PeerNetNSPath, func(_ cnins.NetNS) error {
+			iface, err := bringUpAndSnapshot(cfg.PeerName)
+			if err != nil {
+				return err
+			}
+			result.PeerInterface = &iface
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Bring up the peer in the root namespace.
+		iface, err := bringUpAndSnapshot(cfg.PeerName)
+		if err != nil {
+			return nil, err
+		}
+		result.PeerInterface = &iface
+	}
+
+	return result, nil
+}
+
+// createVxlanDevice creates a VXLAN tunnel endpoint inside the pod netns.
+func createVxlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	cfg := req.Vxlan
+
+	result := &pod.CreateNetdevResult{}
+
+	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+		vxlan := &netlink.Vxlan{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: req.Name,
+			},
+			VxlanId:  int(cfg.VNI),
+			Learning: cfg.Learning,
+		}
+
+		if req.MTU > 0 {
+			vxlan.LinkAttrs.MTU = int(req.MTU)
+		}
+
+		if cfg.Group != "" {
+			vxlan.Group = net.ParseIP(cfg.Group)
+			if vxlan.Group == nil {
+				return fmt.Errorf("invalid vxlan group address %q", cfg.Group)
+			}
+		}
+
+		if cfg.Port > 0 {
+			vxlan.Port = int(cfg.Port)
+		}
+
+		if cfg.UnderlayDevice != "" {
+			parent, err := netlink.LinkByName(cfg.UnderlayDevice)
+			if err != nil {
+				return fmt.Errorf("underlay device %q not found: %w", cfg.UnderlayDevice, err)
+			}
+			vxlan.VtepDevIndex = parent.Attrs().Index
+		}
+
+		if cfg.Local != "" {
+			vxlan.SrcAddr = net.ParseIP(cfg.Local)
+			if vxlan.SrcAddr == nil {
+				return fmt.Errorf("invalid vxlan local address %q", cfg.Local)
+			}
+		}
+
+		if cfg.TTL > 0 {
+			vxlan.TTL = int(cfg.TTL)
+		}
+
+		if err := netlink.LinkAdd(vxlan); err != nil {
+			return fmt.Errorf("failed to create vxlan device %s: %w", req.Name, err)
+		}
+
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("failed to find vxlan %s after creation: %w", req.Name, err)
+		}
+
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// createDummyDevice creates a dummy interface inside the pod netns.
+func createDummyDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	result := &pod.CreateNetdevResult{}
+
+	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+		dummy := &netlink.Dummy{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: req.Name,
+			},
+		}
+
+		if req.MTU > 0 {
+			dummy.LinkAttrs.MTU = int(req.MTU)
+		}
+
+		if err := netlink.LinkAdd(dummy); err != nil {
+			return fmt.Errorf("failed to create dummy device %s: %w", req.Name, err)
+		}
+
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("failed to find dummy %s after creation: %w", req.Name, err)
+		}
+
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// createIPVlanDevice creates an ipvlan subordinate device inside the pod netns.
+func createIPVlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	cfg := req.IPVlan
+	if cfg.Parent == "" {
+		return nil, fmt.Errorf("ipvlan parent is required")
+	}
+
+	result := &pod.CreateNetdevResult{}
+
+	// Resolve the parent link index from the root namespace.
+	parentLink, err := netlink.LinkByName(cfg.Parent)
+	if err != nil {
+		return nil, fmt.Errorf("parent device %q not found: %w", cfg.Parent, err)
+	}
+	parentIndex := parentLink.Attrs().Index
+
+	err = cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+		ipvlan := &netlink.IPVlan{
+			LinkAttrs: netlink.LinkAttrs{
+				Name:        req.Name,
+				ParentIndex: parentIndex,
+			},
+			Mode: toNetlinkIPVlanMode(cfg.Mode),
+			Flag: toNetlinkIPVlanFlag(cfg.Flag),
+		}
+
+		if req.MTU > 0 {
+			ipvlan.LinkAttrs.MTU = int(req.MTU)
+		}
+
+		if err := netlink.LinkAdd(ipvlan); err != nil {
+			return fmt.Errorf("failed to create ipvlan device %s: %w", req.Name, err)
+		}
+
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("failed to find ipvlan %s after creation: %w", req.Name, err)
+		}
+
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// createMacvlanDevice creates a macvlan subordinate device inside the pod netns.
+func createMacvlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	cfg := req.Macvlan
+	if cfg.Parent == "" {
+		return nil, fmt.Errorf("macvlan parent is required")
+	}
+
+	result := &pod.CreateNetdevResult{}
+
+	// Resolve the parent link index from the root namespace.
+	parentLink, err := netlink.LinkByName(cfg.Parent)
+	if err != nil {
+		return nil, fmt.Errorf("parent device %q not found: %w", cfg.Parent, err)
+	}
+	parentIndex := parentLink.Attrs().Index
+
+	err = cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+		macvlan := &netlink.Macvlan{
+			LinkAttrs: netlink.LinkAttrs{
+				Name:        req.Name,
+				ParentIndex: parentIndex,
+			},
+			Mode: toNetlinkMacvlanMode(cfg.Mode),
+		}
+
+		if req.MTU > 0 {
+			macvlan.LinkAttrs.MTU = int(req.MTU)
+		}
+
+		if cfg.MACAddress != "" {
+			hwAddr, err := net.ParseMAC(cfg.MACAddress)
+			if err != nil {
+				return fmt.Errorf("invalid MAC address %q: %w", cfg.MACAddress, err)
+			}
+			macvlan.LinkAttrs.HardwareAddr = hwAddr
+		}
+
+		if err := netlink.LinkAdd(macvlan); err != nil {
+			return fmt.Errorf("failed to create macvlan device %s: %w", req.Name, err)
+		}
+
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("failed to find macvlan %s after creation: %w", req.Name, err)
+		}
+
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// linkToNetworkInterface converts a netlink.Link to a pod.NetworkInterface.
+// The link should be re-fetched after any state changes (e.g. LinkSetUp) to
+// ensure the returned state is current.
+func linkToNetworkInterface(link netlink.Link) pod.NetworkInterface {
+	attrs := link.Attrs()
+	iface := pod.NetworkInterface{
+		Name:       attrs.Name,
+		MACAddress: attrs.HardwareAddr.String(),
+		Type:       pod.NetDev,
+		MTU:        uint32(attrs.MTU),
+	}
+
+	if attrs.OperState == netlink.OperUp || attrs.Flags&net.FlagUp != 0 {
+		iface.State = "UP"
+	} else {
+		iface.State = "DOWN"
+	}
+
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err == nil {
+		for _, addr := range addrs {
+			iface.Addresses = append(iface.Addresses, addr.IPNet.String())
+		}
+	}
+
+	return iface
+}
+
+// bringUpAndSnapshot brings a link up, re-reads it, and returns a snapshot.
+func bringUpAndSnapshot(name string) (pod.NetworkInterface, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return pod.NetworkInterface{}, fmt.Errorf("link %s not found: %w", name, err)
+	}
+	if err := netlink.LinkSetUp(link); err != nil {
+		return pod.NetworkInterface{}, fmt.Errorf("failed to bring up %s: %w", name, err)
+	}
+	// Re-read link to capture updated flags.
+	link, err = netlink.LinkByName(name)
+	if err != nil {
+		return pod.NetworkInterface{}, fmt.Errorf("link %s not found after up: %w", name, err)
+	}
+	return linkToNetworkInterface(link), nil
+}
+
+// toNetlinkIPVlanMode converts a domain IPVlanMode to a netlink.IPVlanMode.
+func toNetlinkIPVlanMode(mode pod.IPVlanMode) netlink.IPVlanMode {
+	switch mode {
+	case pod.IPVlanL3:
+		return netlink.IPVLAN_MODE_L3
+	case pod.IPVlanL3S:
+		return netlink.IPVLAN_MODE_L3S
+	default:
+		return netlink.IPVLAN_MODE_L2
+	}
+}
+
+// toNetlinkIPVlanFlag converts a domain IPVlanFlag to a netlink.IPVlanFlag.
+func toNetlinkIPVlanFlag(flag pod.IPVlanFlag) netlink.IPVlanFlag {
+	switch flag {
+	case pod.IPVlanFlagPrivate:
+		return netlink.IPVLAN_FLAG_PRIVATE
+	case pod.IPVlanFlagVEPA:
+		return netlink.IPVLAN_FLAG_VEPA
+	default:
+		return netlink.IPVLAN_FLAG_BRIDGE
+	}
+}
+
+// toNetlinkMacvlanMode converts a domain MacvlanMode to a netlink.MacvlanMode.
+func toNetlinkMacvlanMode(mode pod.MacvlanMode) netlink.MacvlanMode {
+	switch mode {
+	case pod.MacvlanVEPA:
+		return netlink.MACVLAN_MODE_VEPA
+	case pod.MacvlanPrivate:
+		return netlink.MACVLAN_MODE_PRIVATE
+	case pod.MacvlanPassthru:
+		return netlink.MACVLAN_MODE_PASSTHRU
+	case pod.MacvlanSource:
+		return netlink.MACVLAN_MODE_SOURCE
+	default:
+		return netlink.MACVLAN_MODE_BRIDGE
+	}
+}

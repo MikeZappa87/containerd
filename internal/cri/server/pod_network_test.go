@@ -29,6 +29,8 @@ import (
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+
+	"github.com/containerd/containerd/v2/core/pod"
 )
 
 // requireRoot skips the test if not running as root (needed for netns/netlink).
@@ -446,5 +448,223 @@ func TestMoveNetDevice_MultipleAddresses(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// ———————————————————————————————————————————————
+// CreateNetdev tests
+// ———————————————————————————————————————————————
+
+// TestCreateNetdev_Dummy creates a dummy interface inside a new netns.
+func TestCreateNetdev_Dummy(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	req := pod.CreateNetdevRequest{
+		Name:      "dummy0",
+		MTU:       1400,
+		Addresses: []string{"10.50.0.1/24"},
+		Dummy:     &pod.DummyConfig{},
+	}
+
+	result, err := createNetdev(nsPath, req)
+	if err != nil {
+		t.Fatalf("createNetdev (dummy) failed: %v", err)
+	}
+
+	if result.Interface.Name != "dummy0" {
+		t.Errorf("expected name=dummy0, got %s", result.Interface.Name)
+	}
+	if result.Interface.MTU != 1400 {
+		t.Errorf("expected MTU=1400, got %d", result.Interface.MTU)
+	}
+	if result.Interface.State != "UP" {
+		t.Errorf("expected state=UP, got %s", result.Interface.State)
+	}
+
+	// Verify address.
+	foundAddr := false
+	for _, a := range result.Interface.Addresses {
+		if strings.HasPrefix(a, "10.50.0.1/") {
+			foundAddr = true
+		}
+	}
+	if !foundAddr {
+		t.Errorf("expected address 10.50.0.1/24, got %v", result.Interface.Addresses)
+	}
+
+	// Verify in the netns.
+	err = cnins.WithNetNSPath(nsPath, func(_ cnins.NetNS) error {
+		link, err := netlink.LinkByName("dummy0")
+		if err != nil {
+			return fmt.Errorf("dummy0 not found in netns: %w", err)
+		}
+		if link.Attrs().MTU != 1400 {
+			return fmt.Errorf("expected MTU 1400, got %d", link.Attrs().MTU)
+		}
+		if link.Attrs().Flags&net.FlagUp == 0 {
+			return fmt.Errorf("dummy0 is not UP")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestCreateNetdev_Veth creates a veth pair with one end in the pod netns.
+func TestCreateNetdev_Veth(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	req := pod.CreateNetdevRequest{
+		Name:      "eth0",
+		MTU:       1500,
+		Addresses: []string{"10.60.0.2/24"},
+		Veth: &pod.VethConfig{
+			PeerName: "veth-host0",
+		},
+	}
+
+	result, err := createNetdev(nsPath, req)
+	if err != nil {
+		t.Fatalf("createNetdev (veth) failed: %v", err)
+	}
+	defer cleanupLink("veth-host0") // peer stays in root ns
+
+	if result.Interface.Name != "eth0" {
+		t.Errorf("expected name=eth0, got %s", result.Interface.Name)
+	}
+	if result.Interface.State != "UP" {
+		t.Errorf("expected state=UP, got %s", result.Interface.State)
+	}
+	if result.PeerInterface == nil {
+		t.Fatal("expected peer interface, got nil")
+	}
+	if result.PeerInterface.Name != "veth-host0" {
+		t.Errorf("expected peer name=veth-host0, got %s", result.PeerInterface.Name)
+	}
+
+	// Verify pod end exists in the target netns.
+	err = cnins.WithNetNSPath(nsPath, func(_ cnins.NetNS) error {
+		link, err := netlink.LinkByName("eth0")
+		if err != nil {
+			return fmt.Errorf("eth0 not found in pod netns: %w", err)
+		}
+		if link.Attrs().Flags&net.FlagUp == 0 {
+			return fmt.Errorf("eth0 not UP in pod netns")
+		}
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return fmt.Errorf("failed to list addrs: %w", err)
+		}
+		for _, a := range addrs {
+			if a.IPNet.IP.Equal(net.ParseIP("10.60.0.2")) {
+				return nil
+			}
+		}
+		return fmt.Errorf("address 10.60.0.2 not found on eth0 in pod netns")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify peer exists in root ns.
+	if _, err := netlink.LinkByName("veth-host0"); err != nil {
+		t.Fatalf("peer veth-host0 not found in root ns: %v", err)
+	}
+}
+
+// TestCreateNetdev_Vxlan creates a VXLAN device inside a new netns.
+func TestCreateNetdev_Vxlan(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	req := pod.CreateNetdevRequest{
+		Name: "vxlan100",
+		Vxlan: &pod.VxlanConfig{
+			VNI:  100,
+			Port: 4789,
+		},
+	}
+
+	result, err := createNetdev(nsPath, req)
+	if err != nil {
+		t.Fatalf("createNetdev (vxlan) failed: %v", err)
+	}
+
+	if result.Interface.Name != "vxlan100" {
+		t.Errorf("expected name=vxlan100, got %s", result.Interface.Name)
+	}
+	if result.Interface.State != "UP" {
+		t.Errorf("expected state=UP, got %s", result.Interface.State)
+	}
+
+	// Verify in the netns.
+	err = cnins.WithNetNSPath(nsPath, func(_ cnins.NetNS) error {
+		_, err := netlink.LinkByName("vxlan100")
+		return err
+	})
+	if err != nil {
+		t.Fatalf("vxlan100 not found in netns: %v", err)
+	}
+}
+
+// TestCreateNetdev_NoConfig verifies that omitting all configs returns an error.
+func TestCreateNetdev_NoConfig(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{Name: "bad0"})
+	if err == nil {
+		t.Fatal("expected error when no config is specified")
+	}
+	if !strings.Contains(err.Error(), "exactly one device config") {
+		t.Errorf("expected 'exactly one device config' error, got: %v", err)
+	}
+}
+
+// TestCreateNetdev_DummyNoName verifies that an empty name returns an error.
+func TestCreateNetdev_DummyNoName(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{
+		Dummy: &pod.DummyConfig{},
+	})
+	if err == nil {
+		t.Fatal("expected error when name is empty")
+	}
+	if !strings.Contains(err.Error(), "name is required") {
+		t.Errorf("expected 'name is required' error, got: %v", err)
+	}
+}
+
+// TestCreateNetdev_VethPeerRequired verifies that veth requires a peer name.
+func TestCreateNetdev_VethPeerRequired(t *testing.T) {
+	requireRoot(t)
+
+	nsPath, cleanup := newTestNetNS(t)
+	defer cleanup()
+
+	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{
+		Name: "eth0",
+		Veth: &pod.VethConfig{},
+	})
+	if err == nil {
+		t.Fatal("expected error when veth peer_name is empty")
+	}
+	if !strings.Contains(err.Error(), "peer_name is required") {
+		t.Errorf("expected 'peer_name is required' error, got: %v", err)
 	}
 }

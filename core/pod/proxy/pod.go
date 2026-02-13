@@ -206,3 +206,87 @@ func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID str
 	}
 	return nil
 }
+
+// CreateNetdev creates a new network device inside the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+	apiReq := &api.CreateNetdevRequest{
+		SandboxId: req.SandboxID,
+		Name:      req.Name,
+		Mtu:       req.MTU,
+		Addresses: req.Addresses,
+	}
+
+	switch {
+	case req.Veth != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Veth{
+			Veth: &api.VethConfig{
+				PeerName:      req.Veth.PeerName,
+				PeerNetnsPath: req.Veth.PeerNetNSPath,
+			},
+		}
+	case req.Vxlan != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Vxlan{
+			Vxlan: &api.VxlanConfig{
+				Vni:            req.Vxlan.VNI,
+				Group:          req.Vxlan.Group,
+				Port:           req.Vxlan.Port,
+				UnderlayDevice: req.Vxlan.UnderlayDevice,
+				Local:          req.Vxlan.Local,
+				Ttl:            req.Vxlan.TTL,
+				Learning:       req.Vxlan.Learning,
+			},
+		}
+	case req.Dummy != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Dummy{
+			Dummy: &api.DummyConfig{},
+		}
+	case req.IPVlan != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Ipvlan{
+			Ipvlan: &api.IpvlanConfig{
+				Parent: req.IPVlan.Parent,
+				Mode:   api.IpvlanMode(req.IPVlan.Mode),
+				Flag:   api.IpvlanFlag(req.IPVlan.Flag),
+			},
+		}
+	case req.Macvlan != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Macvlan{
+			Macvlan: &api.MacvlanConfig{
+				Parent:     req.Macvlan.Parent,
+				Mode:       api.MacvlanMode(req.Macvlan.Mode),
+				MacAddress: req.Macvlan.MACAddress,
+			},
+		}
+	}
+
+	resp, err := r.client.CreateNetdev(ctx, apiReq)
+	if err != nil {
+		return nil, errgrpc.ToNative(err)
+	}
+
+	result := &pod.CreateNetdevResult{}
+	if resp.Interface != nil {
+		result.Interface = apiToNetworkInterface(resp.Interface)
+	}
+	if resp.PeerInterface != nil {
+		pi := apiToNetworkInterface(resp.PeerInterface)
+		result.PeerInterface = &pi
+	}
+
+	return result, nil
+}
+
+// apiToNetworkInterface converts an API NetworkInterface to a domain type.
+func apiToNetworkInterface(iface *api.NetworkInterface) pod.NetworkInterface {
+	devType := pod.NetDev
+	if iface.Type == api.DeviceType_RDMA {
+		devType = pod.RDMA
+	}
+	return pod.NetworkInterface{
+		Name:       iface.Name,
+		MACAddress: iface.MacAddress,
+		Type:       devType,
+		MTU:        iface.Mtu,
+		State:      iface.State,
+		Addresses:  iface.Addresses,
+	}
+}

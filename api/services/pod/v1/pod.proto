@@ -44,6 +44,11 @@ service Pod {
 
 	// ApplyRoute adds a route in the pod sandbox's network namespace.
 	rpc ApplyRoute(ApplyRouteRequest) returns (ApplyRouteResponse);
+
+	// CreateNetdev creates a new Linux network device inside the pod
+	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
+	// and macvlan device types.
+	rpc CreateNetdev(CreateNetdevRequest) returns (CreateNetdevResponse);
 }
 
 // DeviceType indicates the kind of device to move into the pod netns.
@@ -225,3 +230,127 @@ message ApplyRouteRequest {
 }
 
 message ApplyRouteResponse {}
+
+// ———————————————————————————————————————————————
+// CreateNetdev
+// ———————————————————————————————————————————————
+
+// MacvlanMode selects the forwarding behavior for macvlan devices.
+enum MacvlanMode {
+	MACVLAN_BRIDGE   = 0;
+	MACVLAN_VEPA     = 1;
+	MACVLAN_PRIVATE  = 2;
+	MACVLAN_PASSTHRU = 3;
+	MACVLAN_SOURCE   = 4;
+}
+
+// IpvlanMode selects the forwarding behavior for ipvlan devices.
+enum IpvlanMode {
+	IPVLAN_L2  = 0;
+	IPVLAN_L3  = 1;
+	IPVLAN_L3S = 2;
+}
+
+// IpvlanFlag selects the isolation mode for ipvlan devices.
+enum IpvlanFlag {
+	IPVLAN_FLAG_BRIDGE  = 0;
+	IPVLAN_FLAG_PRIVATE = 1;
+	IPVLAN_FLAG_VEPA    = 2;
+}
+
+// VethConfig creates a veth pair. One end is placed inside the pod netns
+// (named by the top-level `name` field), the other end stays in the root
+// namespace (or is moved to an optional target netns).
+message VethConfig {
+	// Name of the peer end that remains in the root (or host) namespace.
+	string peer_name = 1;
+
+	// Optional: network namespace path to place the peer end into.
+	// If empty, the peer stays in the root namespace.
+	string peer_netns_path = 2;
+}
+
+// VxlanConfig creates a VXLAN tunnel endpoint inside the pod netns.
+message VxlanConfig {
+	// VXLAN Network Identifier (VNI).
+	uint32 vni = 1;
+
+	// Multicast group or remote unicast IP for BUM traffic.
+	string group = 2;
+
+	// UDP destination port (default 4789 if unset).
+	uint32 port = 3;
+
+	// Name of the underlay (physical) device used for tunnel traffic.
+	// Corresponds to `ip link add ... dev <underlay_device>`.
+	string underlay_device = 4;
+
+	// Source address for outgoing packets.
+	string local = 5;
+
+	// TTL for outgoing packets. 0 means inherit.
+	uint32 ttl = 6;
+
+	// Whether to enable learning of remote MAC/IP entries.
+	bool learning = 7;
+}
+
+// DummyConfig creates a dummy interface. No additional parameters needed
+// beyond the common fields (name, mtu, addresses).
+message DummyConfig {}
+
+// IpvlanConfig creates an ipvlan subordinate device.
+message IpvlanConfig {
+	// Parent (master) interface name (e.g. "eth0").
+	string parent = 1;
+
+	// Forwarding mode.
+	IpvlanMode mode = 2;
+
+	// Isolation flag.
+	IpvlanFlag flag = 3;
+}
+
+// MacvlanConfig creates a macvlan subordinate device.
+message MacvlanConfig {
+	// Parent (master) interface name (e.g. "eth0").
+	string parent = 1;
+
+	// Forwarding mode.
+	MacvlanMode mode = 2;
+
+	// Optional: explicit MAC address. If empty, the kernel assigns one.
+	string mac_address = 3;
+}
+
+message CreateNetdevRequest {
+	// Sandbox to create the device in.
+	string sandbox_id = 1;
+
+	// Name of the device inside the pod netns (e.g. "eth0", "vxlan100").
+	string name = 2;
+
+	// Optional: MTU for the new device. 0 means use the kernel default.
+	uint32 mtu = 3;
+
+	// Optional: IP addresses to assign immediately after creation, in CIDR
+	// notation (e.g. "10.0.0.2/24", "fd00::2/64").
+	repeated string addresses = 4;
+
+	// Device-type-specific configuration. Exactly one must be set.
+	oneof config {
+		VethConfig    veth    = 10;
+		VxlanConfig   vxlan   = 11;
+		DummyConfig   dummy   = 12;
+		IpvlanConfig  ipvlan  = 13;
+		MacvlanConfig macvlan = 14;
+	}
+}
+
+message CreateNetdevResponse {
+	// The final interface state after creation.
+	NetworkInterface interface = 1;
+
+	// For veth: the peer interface info (in whichever namespace it lives).
+	NetworkInterface peer_interface = 2;
+}

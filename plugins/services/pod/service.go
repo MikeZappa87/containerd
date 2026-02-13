@@ -359,3 +359,79 @@ func (s *podService) ApplyRoute(ctx context.Context, req *api.ApplyRouteRequest)
 
 	return &api.ApplyRouteResponse{}, nil
 }
+
+// CreateNetdev creates a new network device inside the pod's network namespace.
+func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequest) (*api.CreateNetdevResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("name", req.Name).Debug("create netdev")
+
+	domReq := corepod.CreateNetdevRequest{
+		SandboxID: req.SandboxId,
+		Name:      req.Name,
+		MTU:       req.Mtu,
+		Addresses: req.Addresses,
+	}
+
+	switch cfg := req.Config.(type) {
+	case *api.CreateNetdevRequest_Veth:
+		domReq.Veth = &corepod.VethConfig{
+			PeerName:      cfg.Veth.PeerName,
+			PeerNetNSPath: cfg.Veth.PeerNetnsPath,
+		}
+	case *api.CreateNetdevRequest_Vxlan:
+		domReq.Vxlan = &corepod.VxlanConfig{
+			VNI:            cfg.Vxlan.Vni,
+			Group:          cfg.Vxlan.Group,
+			Port:           cfg.Vxlan.Port,
+			UnderlayDevice: cfg.Vxlan.UnderlayDevice,
+			Local:          cfg.Vxlan.Local,
+			TTL:            cfg.Vxlan.Ttl,
+			Learning:       cfg.Vxlan.Learning,
+		}
+	case *api.CreateNetdevRequest_Dummy:
+		domReq.Dummy = &corepod.DummyConfig{}
+	case *api.CreateNetdevRequest_Ipvlan:
+		domReq.IPVlan = &corepod.IPVlanConfig{
+			Parent: cfg.Ipvlan.Parent,
+			Mode:   corepod.IPVlanMode(cfg.Ipvlan.Mode),
+			Flag:   corepod.IPVlanFlag(cfg.Ipvlan.Flag),
+		}
+	case *api.CreateNetdevRequest_Macvlan:
+		domReq.Macvlan = &corepod.MacvlanConfig{
+			Parent:     cfg.Macvlan.Parent,
+			Mode:       corepod.MacvlanMode(cfg.Macvlan.Mode),
+			MACAddress: cfg.Macvlan.MacAddress,
+		}
+	default:
+		return nil, fmt.Errorf("exactly one device config must be specified")
+	}
+
+	result, err := s.provider.CreateNetdev(ctx, domReq)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	resp := &api.CreateNetdevResponse{
+		Interface: networkInterfaceToAPI(result.Interface),
+	}
+	if result.PeerInterface != nil {
+		resp.PeerInterface = networkInterfaceToAPI(*result.PeerInterface)
+	}
+
+	return resp, nil
+}
+
+// networkInterfaceToAPI converts a domain NetworkInterface to the API type.
+func networkInterfaceToAPI(iface corepod.NetworkInterface) *api.NetworkInterface {
+	devType := api.DeviceType_NETDEV
+	if iface.Type == corepod.RDMA {
+		devType = api.DeviceType_RDMA
+	}
+	return &api.NetworkInterface{
+		Name:       iface.Name,
+		MacAddress: iface.MACAddress,
+		Type:       devType,
+		Mtu:        iface.MTU,
+		State:      iface.State,
+		Addresses:  iface.Addresses,
+	}
+}

@@ -87,6 +87,101 @@ type MoveDeviceResult struct {
 	Rules      []RoutingRule
 }
 
+// NetdevType identifies a kind of Linux network device.
+type NetdevType int
+
+const (
+	NetdevVeth    NetdevType = iota // virtual Ethernet pair
+	NetdevVxlan                     // VXLAN tunnel endpoint
+	NetdevDummy                     // dummy interface
+	NetdevIPVlan                    // IP-VLAN subordinate device
+	NetdevMacvlan                   // MAC-VLAN subordinate device
+)
+
+// VethConfig holds parameters for creating a veth pair.
+type VethConfig struct {
+	PeerName      string
+	PeerNetNSPath string
+}
+
+// VxlanConfig holds parameters for creating a VXLAN device.
+type VxlanConfig struct {
+	VNI            uint32
+	Group          string
+	Port           uint32
+	UnderlayDevice string
+	Local          string
+	TTL            uint32
+	Learning       bool
+}
+
+// DummyConfig holds parameters for creating a dummy device (no extra fields).
+type DummyConfig struct{}
+
+// IPVlanMode selects the forwarding behavior for ipvlan devices.
+type IPVlanMode int
+
+const (
+	IPVlanL2 IPVlanMode = iota
+	IPVlanL3
+	IPVlanL3S
+)
+
+// IPVlanFlag selects the isolation mode for ipvlan devices.
+type IPVlanFlag int
+
+const (
+	IPVlanFlagBridge IPVlanFlag = iota
+	IPVlanFlagPrivate
+	IPVlanFlagVEPA
+)
+
+// IPVlanConfig holds parameters for creating an ipvlan device.
+type IPVlanConfig struct {
+	Parent string
+	Mode   IPVlanMode
+	Flag   IPVlanFlag
+}
+
+// MacvlanMode selects the forwarding behavior for macvlan devices.
+type MacvlanMode int
+
+const (
+	MacvlanBridge MacvlanMode = iota
+	MacvlanVEPA
+	MacvlanPrivate
+	MacvlanPassthru
+	MacvlanSource
+)
+
+// MacvlanConfig holds parameters for creating a macvlan device.
+type MacvlanConfig struct {
+	Parent     string
+	Mode       MacvlanMode
+	MACAddress string
+}
+
+// CreateNetdevRequest describes a network device to create inside a pod netns.
+type CreateNetdevRequest struct {
+	SandboxID string
+	Name      string
+	MTU       uint32
+	Addresses []string
+
+	// Exactly one of the following config fields must be non-nil.
+	Veth    *VethConfig
+	Vxlan   *VxlanConfig
+	Dummy   *DummyConfig
+	IPVlan  *IPVlanConfig
+	Macvlan *MacvlanConfig
+}
+
+// CreateNetdevResult holds the result of creating a netdev inside a pod netns.
+type CreateNetdevResult struct {
+	Interface     NetworkInterface
+	PeerInterface *NetworkInterface // non-nil only for veth
+}
+
 // PodResourcesClient is the interface for querying pod-level resources
 // by sandbox ID. It is intended for use by external consumers such as
 // the kubelet or DRA drivers.
@@ -103,4 +198,6 @@ type PodResourcesClient interface {
 	AssignIPAddress(ctx context.Context, sandboxID string, interfaceName string, address string) error
 	// ApplyRoute adds a route inside the pod sandbox's network namespace.
 	ApplyRoute(ctx context.Context, sandboxID string, route Route) error
+	// CreateNetdev creates a new network device inside the pod sandbox's network namespace.
+	CreateNetdev(ctx context.Context, req CreateNetdevRequest) (*CreateNetdevResult, error)
 }

@@ -83,6 +83,162 @@ func (DeviceType) EnumDescriptor() ([]byte, []int) {
 	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{0}
 }
 
+// MacvlanMode selects the forwarding behavior for macvlan devices.
+type MacvlanMode int32
+
+const (
+	MacvlanMode_MACVLAN_BRIDGE   MacvlanMode = 0
+	MacvlanMode_MACVLAN_VEPA     MacvlanMode = 1
+	MacvlanMode_MACVLAN_PRIVATE  MacvlanMode = 2
+	MacvlanMode_MACVLAN_PASSTHRU MacvlanMode = 3
+	MacvlanMode_MACVLAN_SOURCE   MacvlanMode = 4
+)
+
+// Enum value maps for MacvlanMode.
+var (
+	MacvlanMode_name = map[int32]string{
+		0: "MACVLAN_BRIDGE",
+		1: "MACVLAN_VEPA",
+		2: "MACVLAN_PRIVATE",
+		3: "MACVLAN_PASSTHRU",
+		4: "MACVLAN_SOURCE",
+	}
+	MacvlanMode_value = map[string]int32{
+		"MACVLAN_BRIDGE":   0,
+		"MACVLAN_VEPA":     1,
+		"MACVLAN_PRIVATE":  2,
+		"MACVLAN_PASSTHRU": 3,
+		"MACVLAN_SOURCE":   4,
+	}
+)
+
+func (x MacvlanMode) Enum() *MacvlanMode {
+	p := new(MacvlanMode)
+	*p = x
+	return p
+}
+
+func (x MacvlanMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MacvlanMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_services_pod_v1_pod_proto_enumTypes[1].Descriptor()
+}
+
+func (MacvlanMode) Type() protoreflect.EnumType {
+	return &file_services_pod_v1_pod_proto_enumTypes[1]
+}
+
+func (x MacvlanMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MacvlanMode.Descriptor instead.
+func (MacvlanMode) EnumDescriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{1}
+}
+
+// IpvlanMode selects the forwarding behavior for ipvlan devices.
+type IpvlanMode int32
+
+const (
+	IpvlanMode_IPVLAN_L2  IpvlanMode = 0
+	IpvlanMode_IPVLAN_L3  IpvlanMode = 1
+	IpvlanMode_IPVLAN_L3S IpvlanMode = 2
+)
+
+// Enum value maps for IpvlanMode.
+var (
+	IpvlanMode_name = map[int32]string{
+		0: "IPVLAN_L2",
+		1: "IPVLAN_L3",
+		2: "IPVLAN_L3S",
+	}
+	IpvlanMode_value = map[string]int32{
+		"IPVLAN_L2":  0,
+		"IPVLAN_L3":  1,
+		"IPVLAN_L3S": 2,
+	}
+)
+
+func (x IpvlanMode) Enum() *IpvlanMode {
+	p := new(IpvlanMode)
+	*p = x
+	return p
+}
+
+func (x IpvlanMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IpvlanMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_services_pod_v1_pod_proto_enumTypes[2].Descriptor()
+}
+
+func (IpvlanMode) Type() protoreflect.EnumType {
+	return &file_services_pod_v1_pod_proto_enumTypes[2]
+}
+
+func (x IpvlanMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IpvlanMode.Descriptor instead.
+func (IpvlanMode) EnumDescriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{2}
+}
+
+// IpvlanFlag selects the isolation mode for ipvlan devices.
+type IpvlanFlag int32
+
+const (
+	IpvlanFlag_IPVLAN_FLAG_BRIDGE  IpvlanFlag = 0
+	IpvlanFlag_IPVLAN_FLAG_PRIVATE IpvlanFlag = 1
+	IpvlanFlag_IPVLAN_FLAG_VEPA    IpvlanFlag = 2
+)
+
+// Enum value maps for IpvlanFlag.
+var (
+	IpvlanFlag_name = map[int32]string{
+		0: "IPVLAN_FLAG_BRIDGE",
+		1: "IPVLAN_FLAG_PRIVATE",
+		2: "IPVLAN_FLAG_VEPA",
+	}
+	IpvlanFlag_value = map[string]int32{
+		"IPVLAN_FLAG_BRIDGE":  0,
+		"IPVLAN_FLAG_PRIVATE": 1,
+		"IPVLAN_FLAG_VEPA":    2,
+	}
+)
+
+func (x IpvlanFlag) Enum() *IpvlanFlag {
+	p := new(IpvlanFlag)
+	*p = x
+	return p
+}
+
+func (x IpvlanFlag) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IpvlanFlag) Descriptor() protoreflect.EnumDescriptor {
+	return file_services_pod_v1_pod_proto_enumTypes[3].Descriptor()
+}
+
+func (IpvlanFlag) Type() protoreflect.EnumType {
+	return &file_services_pod_v1_pod_proto_enumTypes[3]
+}
+
+func (x IpvlanFlag) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IpvlanFlag.Descriptor instead.
+func (IpvlanFlag) EnumDescriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{3}
+}
+
 type GetPodResourcesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
@@ -1073,6 +1229,554 @@ func (*ApplyRouteResponse) Descriptor() ([]byte, []int) {
 	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{16}
 }
 
+// VethConfig creates a veth pair. One end is placed inside the pod netns
+// (named by the top-level `name` field), the other end stays in the root
+// namespace (or is moved to an optional target netns).
+type VethConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name of the peer end that remains in the root (or host) namespace.
+	PeerName string `protobuf:"bytes,1,opt,name=peer_name,json=peerName,proto3" json:"peer_name,omitempty"`
+	// Optional: network namespace path to place the peer end into.
+	// If empty, the peer stays in the root namespace.
+	PeerNetnsPath string `protobuf:"bytes,2,opt,name=peer_netns_path,json=peerNetnsPath,proto3" json:"peer_netns_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VethConfig) Reset() {
+	*x = VethConfig{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VethConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VethConfig) ProtoMessage() {}
+
+func (x *VethConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VethConfig.ProtoReflect.Descriptor instead.
+func (*VethConfig) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *VethConfig) GetPeerName() string {
+	if x != nil {
+		return x.PeerName
+	}
+	return ""
+}
+
+func (x *VethConfig) GetPeerNetnsPath() string {
+	if x != nil {
+		return x.PeerNetnsPath
+	}
+	return ""
+}
+
+// VxlanConfig creates a VXLAN tunnel endpoint inside the pod netns.
+type VxlanConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// VXLAN Network Identifier (VNI).
+	Vni uint32 `protobuf:"varint,1,opt,name=vni,proto3" json:"vni,omitempty"`
+	// Multicast group or remote unicast IP for BUM traffic.
+	Group string `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	// UDP destination port (default 4789 if unset).
+	Port uint32 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	// Name of the underlay (physical) device used for tunnel traffic.
+	// Corresponds to `ip link add ... dev <underlay_device>`.
+	UnderlayDevice string `protobuf:"bytes,4,opt,name=underlay_device,json=underlayDevice,proto3" json:"underlay_device,omitempty"`
+	// Source address for outgoing packets.
+	Local string `protobuf:"bytes,5,opt,name=local,proto3" json:"local,omitempty"`
+	// TTL for outgoing packets. 0 means inherit.
+	Ttl uint32 `protobuf:"varint,6,opt,name=ttl,proto3" json:"ttl,omitempty"`
+	// Whether to enable learning of remote MAC/IP entries.
+	Learning      bool `protobuf:"varint,7,opt,name=learning,proto3" json:"learning,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VxlanConfig) Reset() {
+	*x = VxlanConfig{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VxlanConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VxlanConfig) ProtoMessage() {}
+
+func (x *VxlanConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VxlanConfig.ProtoReflect.Descriptor instead.
+func (*VxlanConfig) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *VxlanConfig) GetVni() uint32 {
+	if x != nil {
+		return x.Vni
+	}
+	return 0
+}
+
+func (x *VxlanConfig) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *VxlanConfig) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *VxlanConfig) GetUnderlayDevice() string {
+	if x != nil {
+		return x.UnderlayDevice
+	}
+	return ""
+}
+
+func (x *VxlanConfig) GetLocal() string {
+	if x != nil {
+		return x.Local
+	}
+	return ""
+}
+
+func (x *VxlanConfig) GetTtl() uint32 {
+	if x != nil {
+		return x.Ttl
+	}
+	return 0
+}
+
+func (x *VxlanConfig) GetLearning() bool {
+	if x != nil {
+		return x.Learning
+	}
+	return false
+}
+
+// DummyConfig creates a dummy interface. No additional parameters needed
+// beyond the common fields (name, mtu, addresses).
+type DummyConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DummyConfig) Reset() {
+	*x = DummyConfig{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DummyConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DummyConfig) ProtoMessage() {}
+
+func (x *DummyConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DummyConfig.ProtoReflect.Descriptor instead.
+func (*DummyConfig) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{19}
+}
+
+// IpvlanConfig creates an ipvlan subordinate device.
+type IpvlanConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Parent (master) interface name (e.g. "eth0").
+	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	// Forwarding mode.
+	Mode IpvlanMode `protobuf:"varint,2,opt,name=mode,proto3,enum=containerd.services.pod.v1.IpvlanMode" json:"mode,omitempty"`
+	// Isolation flag.
+	Flag          IpvlanFlag `protobuf:"varint,3,opt,name=flag,proto3,enum=containerd.services.pod.v1.IpvlanFlag" json:"flag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IpvlanConfig) Reset() {
+	*x = IpvlanConfig{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IpvlanConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IpvlanConfig) ProtoMessage() {}
+
+func (x *IpvlanConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IpvlanConfig.ProtoReflect.Descriptor instead.
+func (*IpvlanConfig) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *IpvlanConfig) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
+func (x *IpvlanConfig) GetMode() IpvlanMode {
+	if x != nil {
+		return x.Mode
+	}
+	return IpvlanMode_IPVLAN_L2
+}
+
+func (x *IpvlanConfig) GetFlag() IpvlanFlag {
+	if x != nil {
+		return x.Flag
+	}
+	return IpvlanFlag_IPVLAN_FLAG_BRIDGE
+}
+
+// MacvlanConfig creates a macvlan subordinate device.
+type MacvlanConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Parent (master) interface name (e.g. "eth0").
+	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	// Forwarding mode.
+	Mode MacvlanMode `protobuf:"varint,2,opt,name=mode,proto3,enum=containerd.services.pod.v1.MacvlanMode" json:"mode,omitempty"`
+	// Optional: explicit MAC address. If empty, the kernel assigns one.
+	MacAddress    string `protobuf:"bytes,3,opt,name=mac_address,json=macAddress,proto3" json:"mac_address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MacvlanConfig) Reset() {
+	*x = MacvlanConfig{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MacvlanConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MacvlanConfig) ProtoMessage() {}
+
+func (x *MacvlanConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MacvlanConfig.ProtoReflect.Descriptor instead.
+func (*MacvlanConfig) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *MacvlanConfig) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
+func (x *MacvlanConfig) GetMode() MacvlanMode {
+	if x != nil {
+		return x.Mode
+	}
+	return MacvlanMode_MACVLAN_BRIDGE
+}
+
+func (x *MacvlanConfig) GetMacAddress() string {
+	if x != nil {
+		return x.MacAddress
+	}
+	return ""
+}
+
+type CreateNetdevRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Sandbox to create the device in.
+	SandboxId string `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// Name of the device inside the pod netns (e.g. "eth0", "vxlan100").
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Optional: MTU for the new device. 0 means use the kernel default.
+	Mtu uint32 `protobuf:"varint,3,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	// Optional: IP addresses to assign immediately after creation, in CIDR
+	// notation (e.g. "10.0.0.2/24", "fd00::2/64").
+	Addresses []string `protobuf:"bytes,4,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	// Device-type-specific configuration. Exactly one must be set.
+	//
+	// Types that are valid to be assigned to Config:
+	//
+	//	*CreateNetdevRequest_Veth
+	//	*CreateNetdevRequest_Vxlan
+	//	*CreateNetdevRequest_Dummy
+	//	*CreateNetdevRequest_Ipvlan
+	//	*CreateNetdevRequest_Macvlan
+	Config        isCreateNetdevRequest_Config `protobuf_oneof:"config"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateNetdevRequest) Reset() {
+	*x = CreateNetdevRequest{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateNetdevRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateNetdevRequest) ProtoMessage() {}
+
+func (x *CreateNetdevRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateNetdevRequest.ProtoReflect.Descriptor instead.
+func (*CreateNetdevRequest) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *CreateNetdevRequest) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *CreateNetdevRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateNetdevRequest) GetMtu() uint32 {
+	if x != nil {
+		return x.Mtu
+	}
+	return 0
+}
+
+func (x *CreateNetdevRequest) GetAddresses() []string {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetConfig() isCreateNetdevRequest_Config {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetVeth() *VethConfig {
+	if x != nil {
+		if x, ok := x.Config.(*CreateNetdevRequest_Veth); ok {
+			return x.Veth
+		}
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetVxlan() *VxlanConfig {
+	if x != nil {
+		if x, ok := x.Config.(*CreateNetdevRequest_Vxlan); ok {
+			return x.Vxlan
+		}
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetDummy() *DummyConfig {
+	if x != nil {
+		if x, ok := x.Config.(*CreateNetdevRequest_Dummy); ok {
+			return x.Dummy
+		}
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetIpvlan() *IpvlanConfig {
+	if x != nil {
+		if x, ok := x.Config.(*CreateNetdevRequest_Ipvlan); ok {
+			return x.Ipvlan
+		}
+	}
+	return nil
+}
+
+func (x *CreateNetdevRequest) GetMacvlan() *MacvlanConfig {
+	if x != nil {
+		if x, ok := x.Config.(*CreateNetdevRequest_Macvlan); ok {
+			return x.Macvlan
+		}
+	}
+	return nil
+}
+
+type isCreateNetdevRequest_Config interface {
+	isCreateNetdevRequest_Config()
+}
+
+type CreateNetdevRequest_Veth struct {
+	Veth *VethConfig `protobuf:"bytes,10,opt,name=veth,proto3,oneof"`
+}
+
+type CreateNetdevRequest_Vxlan struct {
+	Vxlan *VxlanConfig `protobuf:"bytes,11,opt,name=vxlan,proto3,oneof"`
+}
+
+type CreateNetdevRequest_Dummy struct {
+	Dummy *DummyConfig `protobuf:"bytes,12,opt,name=dummy,proto3,oneof"`
+}
+
+type CreateNetdevRequest_Ipvlan struct {
+	Ipvlan *IpvlanConfig `protobuf:"bytes,13,opt,name=ipvlan,proto3,oneof"`
+}
+
+type CreateNetdevRequest_Macvlan struct {
+	Macvlan *MacvlanConfig `protobuf:"bytes,14,opt,name=macvlan,proto3,oneof"`
+}
+
+func (*CreateNetdevRequest_Veth) isCreateNetdevRequest_Config() {}
+
+func (*CreateNetdevRequest_Vxlan) isCreateNetdevRequest_Config() {}
+
+func (*CreateNetdevRequest_Dummy) isCreateNetdevRequest_Config() {}
+
+func (*CreateNetdevRequest_Ipvlan) isCreateNetdevRequest_Config() {}
+
+func (*CreateNetdevRequest_Macvlan) isCreateNetdevRequest_Config() {}
+
+type CreateNetdevResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The final interface state after creation.
+	Interface *NetworkInterface `protobuf:"bytes,1,opt,name=interface,proto3" json:"interface,omitempty"`
+	// For veth: the peer interface info (in whichever namespace it lives).
+	PeerInterface *NetworkInterface `protobuf:"bytes,2,opt,name=peer_interface,json=peerInterface,proto3" json:"peer_interface,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateNetdevResponse) Reset() {
+	*x = CreateNetdevResponse{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateNetdevResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateNetdevResponse) ProtoMessage() {}
+
+func (x *CreateNetdevResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateNetdevResponse.ProtoReflect.Descriptor instead.
+func (*CreateNetdevResponse) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CreateNetdevResponse) GetInterface() *NetworkInterface {
+	if x != nil {
+		return x.Interface
+	}
+	return nil
+}
+
+func (x *CreateNetdevResponse) GetPeerInterface() *NetworkInterface {
+	if x != nil {
+		return x.PeerInterface
+	}
+	return nil
+}
+
 var File_services_pod_v1_pod_proto protoreflect.FileDescriptor
 
 const file_services_pod_v1_pod_proto_rawDesc = "" +
@@ -1154,12 +1858,67 @@ const file_services_pod_v1_pod_proto_rawDesc = "" +
 	"\n" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12<\n" +
 	"\x05route\x18\x02 \x01(\v2&.containerd.services.pod.v1.RouteEntryR\x05route\"\x14\n" +
-	"\x12ApplyRouteResponse*\"\n" +
+	"\x12ApplyRouteResponse\"Q\n" +
+	"\n" +
+	"VethConfig\x12\x1b\n" +
+	"\tpeer_name\x18\x01 \x01(\tR\bpeerName\x12&\n" +
+	"\x0fpeer_netns_path\x18\x02 \x01(\tR\rpeerNetnsPath\"\xb6\x01\n" +
+	"\vVxlanConfig\x12\x10\n" +
+	"\x03vni\x18\x01 \x01(\rR\x03vni\x12\x14\n" +
+	"\x05group\x18\x02 \x01(\tR\x05group\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\rR\x04port\x12'\n" +
+	"\x0funderlay_device\x18\x04 \x01(\tR\x0eunderlayDevice\x12\x14\n" +
+	"\x05local\x18\x05 \x01(\tR\x05local\x12\x10\n" +
+	"\x03ttl\x18\x06 \x01(\rR\x03ttl\x12\x1a\n" +
+	"\blearning\x18\a \x01(\bR\blearning\"\r\n" +
+	"\vDummyConfig\"\x9e\x01\n" +
+	"\fIpvlanConfig\x12\x16\n" +
+	"\x06parent\x18\x01 \x01(\tR\x06parent\x12:\n" +
+	"\x04mode\x18\x02 \x01(\x0e2&.containerd.services.pod.v1.IpvlanModeR\x04mode\x12:\n" +
+	"\x04flag\x18\x03 \x01(\x0e2&.containerd.services.pod.v1.IpvlanFlagR\x04flag\"\x85\x01\n" +
+	"\rMacvlanConfig\x12\x16\n" +
+	"\x06parent\x18\x01 \x01(\tR\x06parent\x12;\n" +
+	"\x04mode\x18\x02 \x01(\x0e2'.containerd.services.pod.v1.MacvlanModeR\x04mode\x12\x1f\n" +
+	"\vmac_address\x18\x03 \x01(\tR\n" +
+	"macAddress\"\xcd\x03\n" +
+	"\x13CreateNetdevRequest\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03mtu\x18\x03 \x01(\rR\x03mtu\x12\x1c\n" +
+	"\taddresses\x18\x04 \x03(\tR\taddresses\x12<\n" +
+	"\x04veth\x18\n" +
+	" \x01(\v2&.containerd.services.pod.v1.VethConfigH\x00R\x04veth\x12?\n" +
+	"\x05vxlan\x18\v \x01(\v2'.containerd.services.pod.v1.VxlanConfigH\x00R\x05vxlan\x12?\n" +
+	"\x05dummy\x18\f \x01(\v2'.containerd.services.pod.v1.DummyConfigH\x00R\x05dummy\x12B\n" +
+	"\x06ipvlan\x18\r \x01(\v2(.containerd.services.pod.v1.IpvlanConfigH\x00R\x06ipvlan\x12E\n" +
+	"\amacvlan\x18\x0e \x01(\v2).containerd.services.pod.v1.MacvlanConfigH\x00R\amacvlanB\b\n" +
+	"\x06config\"\xb7\x01\n" +
+	"\x14CreateNetdevResponse\x12J\n" +
+	"\tinterface\x18\x01 \x01(\v2,.containerd.services.pod.v1.NetworkInterfaceR\tinterface\x12S\n" +
+	"\x0epeer_interface\x18\x02 \x01(\v2,.containerd.services.pod.v1.NetworkInterfaceR\rpeerInterface*\"\n" +
 	"\n" +
 	"DeviceType\x12\n" +
 	"\n" +
 	"\x06NETDEV\x10\x00\x12\b\n" +
-	"\x04RDMA\x10\x012\xb7\x05\n" +
+	"\x04RDMA\x10\x01*r\n" +
+	"\vMacvlanMode\x12\x12\n" +
+	"\x0eMACVLAN_BRIDGE\x10\x00\x12\x10\n" +
+	"\fMACVLAN_VEPA\x10\x01\x12\x13\n" +
+	"\x0fMACVLAN_PRIVATE\x10\x02\x12\x14\n" +
+	"\x10MACVLAN_PASSTHRU\x10\x03\x12\x12\n" +
+	"\x0eMACVLAN_SOURCE\x10\x04*:\n" +
+	"\n" +
+	"IpvlanMode\x12\r\n" +
+	"\tIPVLAN_L2\x10\x00\x12\r\n" +
+	"\tIPVLAN_L3\x10\x01\x12\x0e\n" +
+	"\n" +
+	"IPVLAN_L3S\x10\x02*S\n" +
+	"\n" +
+	"IpvlanFlag\x12\x16\n" +
+	"\x12IPVLAN_FLAG_BRIDGE\x10\x00\x12\x17\n" +
+	"\x13IPVLAN_FLAG_PRIVATE\x10\x01\x12\x14\n" +
+	"\x10IPVLAN_FLAG_VEPA\x10\x022\xaa\x06\n" +
 	"\x03Pod\x12z\n" +
 	"\x0fGetPodResources\x122.containerd.services.pod.v1.GetPodResourcesRequest\x1a3.containerd.services.pod.v1.GetPodResourcesResponse\x12h\n" +
 	"\tGetPodIPs\x12,.containerd.services.pod.v1.GetPodIPsRequest\x1a-.containerd.services.pod.v1.GetPodIPsResponse\x12t\n" +
@@ -1168,7 +1927,8 @@ const file_services_pod_v1_pod_proto_rawDesc = "" +
 	"MoveDevice\x12-.containerd.services.pod.v1.MoveDeviceRequest\x1a..containerd.services.pod.v1.MoveDeviceResponse\x12z\n" +
 	"\x0fAssignIPAddress\x122.containerd.services.pod.v1.AssignIPAddressRequest\x1a3.containerd.services.pod.v1.AssignIPAddressResponse\x12k\n" +
 	"\n" +
-	"ApplyRoute\x12-.containerd.services.pod.v1.ApplyRouteRequest\x1a..containerd.services.pod.v1.ApplyRouteResponseB:Z8github.com/containerd/containerd/api/services/pod/v1;podb\x06proto3"
+	"ApplyRoute\x12-.containerd.services.pod.v1.ApplyRouteRequest\x1a..containerd.services.pod.v1.ApplyRouteResponse\x12q\n" +
+	"\fCreateNetdev\x12/.containerd.services.pod.v1.CreateNetdevRequest\x1a0.containerd.services.pod.v1.CreateNetdevResponseB:Z8github.com/containerd/containerd/api/services/pod/v1;podb\x06proto3"
 
 var (
 	file_services_pod_v1_pod_proto_rawDescOnce sync.Once
@@ -1182,58 +1942,80 @@ func file_services_pod_v1_pod_proto_rawDescGZIP() []byte {
 	return file_services_pod_v1_pod_proto_rawDescData
 }
 
-var file_services_pod_v1_pod_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_services_pod_v1_pod_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_services_pod_v1_pod_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_services_pod_v1_pod_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_services_pod_v1_pod_proto_goTypes = []any{
 	(DeviceType)(0),                 // 0: containerd.services.pod.v1.DeviceType
-	(*GetPodResourcesRequest)(nil),  // 1: containerd.services.pod.v1.GetPodResourcesRequest
-	(*GetPodResourcesResponse)(nil), // 2: containerd.services.pod.v1.GetPodResourcesResponse
-	(*GetPodIPsRequest)(nil),        // 3: containerd.services.pod.v1.GetPodIPsRequest
-	(*PodInterfaceIPs)(nil),         // 4: containerd.services.pod.v1.PodInterfaceIPs
-	(*PodRoute)(nil),                // 5: containerd.services.pod.v1.PodRoute
-	(*GetPodIPsResponse)(nil),       // 6: containerd.services.pod.v1.GetPodIPsResponse
-	(*GetPodNetworkRequest)(nil),    // 7: containerd.services.pod.v1.GetPodNetworkRequest
-	(*NetworkInterface)(nil),        // 8: containerd.services.pod.v1.NetworkInterface
-	(*RouteEntry)(nil),              // 9: containerd.services.pod.v1.RouteEntry
-	(*RoutingRule)(nil),             // 10: containerd.services.pod.v1.RoutingRule
-	(*GetPodNetworkResponse)(nil),   // 11: containerd.services.pod.v1.GetPodNetworkResponse
-	(*MoveDeviceRequest)(nil),       // 12: containerd.services.pod.v1.MoveDeviceRequest
-	(*MoveDeviceResponse)(nil),      // 13: containerd.services.pod.v1.MoveDeviceResponse
-	(*AssignIPAddressRequest)(nil),  // 14: containerd.services.pod.v1.AssignIPAddressRequest
-	(*AssignIPAddressResponse)(nil), // 15: containerd.services.pod.v1.AssignIPAddressResponse
-	(*ApplyRouteRequest)(nil),       // 16: containerd.services.pod.v1.ApplyRouteRequest
-	(*ApplyRouteResponse)(nil),      // 17: containerd.services.pod.v1.ApplyRouteResponse
-	nil,                             // 18: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
+	(MacvlanMode)(0),                // 1: containerd.services.pod.v1.MacvlanMode
+	(IpvlanMode)(0),                 // 2: containerd.services.pod.v1.IpvlanMode
+	(IpvlanFlag)(0),                 // 3: containerd.services.pod.v1.IpvlanFlag
+	(*GetPodResourcesRequest)(nil),  // 4: containerd.services.pod.v1.GetPodResourcesRequest
+	(*GetPodResourcesResponse)(nil), // 5: containerd.services.pod.v1.GetPodResourcesResponse
+	(*GetPodIPsRequest)(nil),        // 6: containerd.services.pod.v1.GetPodIPsRequest
+	(*PodInterfaceIPs)(nil),         // 7: containerd.services.pod.v1.PodInterfaceIPs
+	(*PodRoute)(nil),                // 8: containerd.services.pod.v1.PodRoute
+	(*GetPodIPsResponse)(nil),       // 9: containerd.services.pod.v1.GetPodIPsResponse
+	(*GetPodNetworkRequest)(nil),    // 10: containerd.services.pod.v1.GetPodNetworkRequest
+	(*NetworkInterface)(nil),        // 11: containerd.services.pod.v1.NetworkInterface
+	(*RouteEntry)(nil),              // 12: containerd.services.pod.v1.RouteEntry
+	(*RoutingRule)(nil),             // 13: containerd.services.pod.v1.RoutingRule
+	(*GetPodNetworkResponse)(nil),   // 14: containerd.services.pod.v1.GetPodNetworkResponse
+	(*MoveDeviceRequest)(nil),       // 15: containerd.services.pod.v1.MoveDeviceRequest
+	(*MoveDeviceResponse)(nil),      // 16: containerd.services.pod.v1.MoveDeviceResponse
+	(*AssignIPAddressRequest)(nil),  // 17: containerd.services.pod.v1.AssignIPAddressRequest
+	(*AssignIPAddressResponse)(nil), // 18: containerd.services.pod.v1.AssignIPAddressResponse
+	(*ApplyRouteRequest)(nil),       // 19: containerd.services.pod.v1.ApplyRouteRequest
+	(*ApplyRouteResponse)(nil),      // 20: containerd.services.pod.v1.ApplyRouteResponse
+	(*VethConfig)(nil),              // 21: containerd.services.pod.v1.VethConfig
+	(*VxlanConfig)(nil),             // 22: containerd.services.pod.v1.VxlanConfig
+	(*DummyConfig)(nil),             // 23: containerd.services.pod.v1.DummyConfig
+	(*IpvlanConfig)(nil),            // 24: containerd.services.pod.v1.IpvlanConfig
+	(*MacvlanConfig)(nil),           // 25: containerd.services.pod.v1.MacvlanConfig
+	(*CreateNetdevRequest)(nil),     // 26: containerd.services.pod.v1.CreateNetdevRequest
+	(*CreateNetdevResponse)(nil),    // 27: containerd.services.pod.v1.CreateNetdevResponse
+	nil,                             // 28: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
 }
 var file_services_pod_v1_pod_proto_depIdxs = []int32{
-	18, // 0: containerd.services.pod.v1.GetPodIPsResponse.interface_ips:type_name -> containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
-	5,  // 1: containerd.services.pod.v1.GetPodIPsResponse.routes:type_name -> containerd.services.pod.v1.PodRoute
+	28, // 0: containerd.services.pod.v1.GetPodIPsResponse.interface_ips:type_name -> containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
+	8,  // 1: containerd.services.pod.v1.GetPodIPsResponse.routes:type_name -> containerd.services.pod.v1.PodRoute
 	0,  // 2: containerd.services.pod.v1.NetworkInterface.type:type_name -> containerd.services.pod.v1.DeviceType
-	8,  // 3: containerd.services.pod.v1.GetPodNetworkResponse.interfaces:type_name -> containerd.services.pod.v1.NetworkInterface
-	9,  // 4: containerd.services.pod.v1.GetPodNetworkResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
-	10, // 5: containerd.services.pod.v1.GetPodNetworkResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
+	11, // 3: containerd.services.pod.v1.GetPodNetworkResponse.interfaces:type_name -> containerd.services.pod.v1.NetworkInterface
+	12, // 4: containerd.services.pod.v1.GetPodNetworkResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
+	13, // 5: containerd.services.pod.v1.GetPodNetworkResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
 	0,  // 6: containerd.services.pod.v1.MoveDeviceRequest.device_type:type_name -> containerd.services.pod.v1.DeviceType
-	9,  // 7: containerd.services.pod.v1.MoveDeviceResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
-	10, // 8: containerd.services.pod.v1.MoveDeviceResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
-	9,  // 9: containerd.services.pod.v1.ApplyRouteRequest.route:type_name -> containerd.services.pod.v1.RouteEntry
-	4,  // 10: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry.value:type_name -> containerd.services.pod.v1.PodInterfaceIPs
-	1,  // 11: containerd.services.pod.v1.Pod.GetPodResources:input_type -> containerd.services.pod.v1.GetPodResourcesRequest
-	3,  // 12: containerd.services.pod.v1.Pod.GetPodIPs:input_type -> containerd.services.pod.v1.GetPodIPsRequest
-	7,  // 13: containerd.services.pod.v1.Pod.GetPodNetwork:input_type -> containerd.services.pod.v1.GetPodNetworkRequest
-	12, // 14: containerd.services.pod.v1.Pod.MoveDevice:input_type -> containerd.services.pod.v1.MoveDeviceRequest
-	14, // 15: containerd.services.pod.v1.Pod.AssignIPAddress:input_type -> containerd.services.pod.v1.AssignIPAddressRequest
-	16, // 16: containerd.services.pod.v1.Pod.ApplyRoute:input_type -> containerd.services.pod.v1.ApplyRouteRequest
-	2,  // 17: containerd.services.pod.v1.Pod.GetPodResources:output_type -> containerd.services.pod.v1.GetPodResourcesResponse
-	6,  // 18: containerd.services.pod.v1.Pod.GetPodIPs:output_type -> containerd.services.pod.v1.GetPodIPsResponse
-	11, // 19: containerd.services.pod.v1.Pod.GetPodNetwork:output_type -> containerd.services.pod.v1.GetPodNetworkResponse
-	13, // 20: containerd.services.pod.v1.Pod.MoveDevice:output_type -> containerd.services.pod.v1.MoveDeviceResponse
-	15, // 21: containerd.services.pod.v1.Pod.AssignIPAddress:output_type -> containerd.services.pod.v1.AssignIPAddressResponse
-	17, // 22: containerd.services.pod.v1.Pod.ApplyRoute:output_type -> containerd.services.pod.v1.ApplyRouteResponse
-	17, // [17:23] is the sub-list for method output_type
-	11, // [11:17] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	12, // 7: containerd.services.pod.v1.MoveDeviceResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
+	13, // 8: containerd.services.pod.v1.MoveDeviceResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
+	12, // 9: containerd.services.pod.v1.ApplyRouteRequest.route:type_name -> containerd.services.pod.v1.RouteEntry
+	2,  // 10: containerd.services.pod.v1.IpvlanConfig.mode:type_name -> containerd.services.pod.v1.IpvlanMode
+	3,  // 11: containerd.services.pod.v1.IpvlanConfig.flag:type_name -> containerd.services.pod.v1.IpvlanFlag
+	1,  // 12: containerd.services.pod.v1.MacvlanConfig.mode:type_name -> containerd.services.pod.v1.MacvlanMode
+	21, // 13: containerd.services.pod.v1.CreateNetdevRequest.veth:type_name -> containerd.services.pod.v1.VethConfig
+	22, // 14: containerd.services.pod.v1.CreateNetdevRequest.vxlan:type_name -> containerd.services.pod.v1.VxlanConfig
+	23, // 15: containerd.services.pod.v1.CreateNetdevRequest.dummy:type_name -> containerd.services.pod.v1.DummyConfig
+	24, // 16: containerd.services.pod.v1.CreateNetdevRequest.ipvlan:type_name -> containerd.services.pod.v1.IpvlanConfig
+	25, // 17: containerd.services.pod.v1.CreateNetdevRequest.macvlan:type_name -> containerd.services.pod.v1.MacvlanConfig
+	11, // 18: containerd.services.pod.v1.CreateNetdevResponse.interface:type_name -> containerd.services.pod.v1.NetworkInterface
+	11, // 19: containerd.services.pod.v1.CreateNetdevResponse.peer_interface:type_name -> containerd.services.pod.v1.NetworkInterface
+	7,  // 20: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry.value:type_name -> containerd.services.pod.v1.PodInterfaceIPs
+	4,  // 21: containerd.services.pod.v1.Pod.GetPodResources:input_type -> containerd.services.pod.v1.GetPodResourcesRequest
+	6,  // 22: containerd.services.pod.v1.Pod.GetPodIPs:input_type -> containerd.services.pod.v1.GetPodIPsRequest
+	10, // 23: containerd.services.pod.v1.Pod.GetPodNetwork:input_type -> containerd.services.pod.v1.GetPodNetworkRequest
+	15, // 24: containerd.services.pod.v1.Pod.MoveDevice:input_type -> containerd.services.pod.v1.MoveDeviceRequest
+	17, // 25: containerd.services.pod.v1.Pod.AssignIPAddress:input_type -> containerd.services.pod.v1.AssignIPAddressRequest
+	19, // 26: containerd.services.pod.v1.Pod.ApplyRoute:input_type -> containerd.services.pod.v1.ApplyRouteRequest
+	26, // 27: containerd.services.pod.v1.Pod.CreateNetdev:input_type -> containerd.services.pod.v1.CreateNetdevRequest
+	5,  // 28: containerd.services.pod.v1.Pod.GetPodResources:output_type -> containerd.services.pod.v1.GetPodResourcesResponse
+	9,  // 29: containerd.services.pod.v1.Pod.GetPodIPs:output_type -> containerd.services.pod.v1.GetPodIPsResponse
+	14, // 30: containerd.services.pod.v1.Pod.GetPodNetwork:output_type -> containerd.services.pod.v1.GetPodNetworkResponse
+	16, // 31: containerd.services.pod.v1.Pod.MoveDevice:output_type -> containerd.services.pod.v1.MoveDeviceResponse
+	18, // 32: containerd.services.pod.v1.Pod.AssignIPAddress:output_type -> containerd.services.pod.v1.AssignIPAddressResponse
+	20, // 33: containerd.services.pod.v1.Pod.ApplyRoute:output_type -> containerd.services.pod.v1.ApplyRouteResponse
+	27, // 34: containerd.services.pod.v1.Pod.CreateNetdev:output_type -> containerd.services.pod.v1.CreateNetdevResponse
+	28, // [28:35] is the sub-list for method output_type
+	21, // [21:28] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_services_pod_v1_pod_proto_init() }
@@ -1241,13 +2023,20 @@ func file_services_pod_v1_pod_proto_init() {
 	if File_services_pod_v1_pod_proto != nil {
 		return
 	}
+	file_services_pod_v1_pod_proto_msgTypes[22].OneofWrappers = []any{
+		(*CreateNetdevRequest_Veth)(nil),
+		(*CreateNetdevRequest_Vxlan)(nil),
+		(*CreateNetdevRequest_Dummy)(nil),
+		(*CreateNetdevRequest_Ipvlan)(nil),
+		(*CreateNetdevRequest_Macvlan)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_pod_v1_pod_proto_rawDesc), len(file_services_pod_v1_pod_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   18,
+			NumEnums:      4,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
