@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
+	corepod "github.com/containerd/containerd/v2/core/pod"
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -223,4 +224,138 @@ func (s *podService) GetPodIPs(ctx context.Context, req *api.GetPodIPsRequest) (
 		InterfaceIps: ifaces,
 		Routes:       routes,
 	}, nil
+}
+
+// GetPodNetwork returns the full network state of a sandbox.
+func (s *podService) GetPodNetwork(ctx context.Context, req *api.GetPodNetworkRequest) (*api.GetPodNetworkResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).Debug("get pod network")
+
+	state, err := s.provider.GetPodNetwork(ctx, req.SandboxId)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	if state == nil {
+		return &api.GetPodNetworkResponse{}, nil
+	}
+
+	resp := &api.GetPodNetworkResponse{}
+
+	for _, iface := range state.Interfaces {
+		devType := api.DeviceType_NETDEV
+		if iface.Type == corepod.RDMA {
+			devType = api.DeviceType_RDMA
+		}
+		resp.Interfaces = append(resp.Interfaces, &api.NetworkInterface{
+			Name:       iface.Name,
+			MacAddress: iface.MACAddress,
+			Type:       devType,
+			Mtu:        iface.MTU,
+			State:      iface.State,
+			Addresses:  iface.Addresses,
+		})
+	}
+
+	for _, rt := range state.Routes {
+		resp.Routes = append(resp.Routes, &api.RouteEntry{
+			Destination:   rt.Destination,
+			Gateway:       rt.Gateway,
+			InterfaceName: rt.InterfaceName,
+			Metric:        rt.Metric,
+			Scope:         rt.Scope,
+		})
+	}
+
+	for _, rl := range state.Rules {
+		resp.Rules = append(resp.Rules, &api.RoutingRule{
+			Priority: rl.Priority,
+			Src:      rl.Src,
+			Dst:      rl.Dst,
+			Table:    rl.Table,
+			Iif:      rl.IIF,
+			Oif:      rl.OIF,
+		})
+	}
+
+	return resp, nil
+}
+
+// MoveDevice moves a network device from the root netns into the pod's netns.
+func (s *podService) MoveDevice(ctx context.Context, req *api.MoveDeviceRequest) (*api.MoveDeviceResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("device", req.DeviceName).Debug("move device")
+
+	var devType corepod.DeviceType
+	switch req.DeviceType {
+	case api.DeviceType_RDMA:
+		devType = corepod.RDMA
+	default:
+		devType = corepod.NetDev
+	}
+
+	result, err := s.provider.MoveDevice(ctx, req.SandboxId, req.DeviceName, devType, req.TargetName)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	resp := &api.MoveDeviceResponse{
+		DeviceName: result.DeviceName,
+		Addresses:  result.Addresses,
+	}
+
+	for _, rt := range result.Routes {
+		resp.Routes = append(resp.Routes, &api.RouteEntry{
+			Destination:   rt.Destination,
+			Gateway:       rt.Gateway,
+			InterfaceName: rt.InterfaceName,
+			Metric:        rt.Metric,
+			Scope:         rt.Scope,
+		})
+	}
+
+	for _, rl := range result.Rules {
+		resp.Rules = append(resp.Rules, &api.RoutingRule{
+			Priority: rl.Priority,
+			Src:      rl.Src,
+			Dst:      rl.Dst,
+			Table:    rl.Table,
+			Iif:      rl.IIF,
+			Oif:      rl.OIF,
+		})
+	}
+
+	return resp, nil
+}
+
+// AssignIPAddress assigns an IP address to an interface inside the pod netns.
+func (s *podService) AssignIPAddress(ctx context.Context, req *api.AssignIPAddressRequest) (*api.AssignIPAddressResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("interface", req.InterfaceName).Debug("assign ip address")
+
+	if err := s.provider.AssignIPAddress(ctx, req.SandboxId, req.InterfaceName, req.Address); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &api.AssignIPAddressResponse{}, nil
+}
+
+// ApplyRoute adds a route inside the pod's network namespace.
+func (s *podService) ApplyRoute(ctx context.Context, req *api.ApplyRouteRequest) (*api.ApplyRouteResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).Debug("apply route")
+
+	if req.Route == nil {
+		return nil, fmt.Errorf("route is required")
+	}
+
+	rt := corepod.Route{
+		Destination:   req.Route.Destination,
+		Gateway:       req.Route.Gateway,
+		InterfaceName: req.Route.InterfaceName,
+		Metric:        req.Route.Metric,
+		Scope:         req.Route.Scope,
+	}
+
+	if err := s.provider.ApplyRoute(ctx, req.SandboxId, rt); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &api.ApplyRouteResponse{}, nil
 }

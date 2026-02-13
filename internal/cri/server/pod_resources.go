@@ -35,6 +35,14 @@ type PodResourcesProvider interface {
 	GetPodResources(ctx context.Context, sandboxID string) (string, error)
 	// GetPodIPs returns the network status (interfaces, IPs, and routes) for the sandbox.
 	GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodNetworkStatus, error)
+	// GetPodNetwork returns the full network state of the sandbox.
+	GetPodNetwork(ctx context.Context, sandboxID string) (*pod.PodNetworkState, error)
+	// MoveDevice moves a network device into the sandbox's network namespace.
+	MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType pod.DeviceType, targetName string) (*pod.MoveDeviceResult, error)
+	// AssignIPAddress assigns an IP address to an interface in the sandbox's network namespace.
+	AssignIPAddress(ctx context.Context, sandboxID string, interfaceName string, address string) error
+	// ApplyRoute adds a route in the sandbox's network namespace.
+	ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error
 }
 
 // GetPodResources returns the network namespace path for the sandbox identified by sandboxID.

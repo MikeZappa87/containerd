@@ -20,13 +20,41 @@ package containerd.services.pod.v1;
 
 option go_package = "github.com/containerd/containerd/api/services/pod/v1;pod";
 
-// Pod provides an API for querying pod-level resources.
+// Pod provides an API for managing pod-level network resources.
 service Pod {
 	// GetPodResources returns resources associated with a pod sandbox.
 	rpc GetPodResources(GetPodResourcesRequest) returns (GetPodResourcesResponse);
+
 	// GetPodIPs returns the IP addresses assigned to a pod sandbox.
 	rpc GetPodIPs(GetPodIPsRequest) returns (GetPodIPsResponse);
+
+	// GetPodNetwork returns the full network state of a pod sandbox,
+	// including all interfaces, IP addresses, routes, and routing rules.
+	rpc GetPodNetwork(GetPodNetworkRequest) returns (GetPodNetworkResponse);
+
+	// MoveDevice moves a network device (netdev or RDMA) from the root
+	// network namespace into the pod sandbox's network namespace. Any IP
+	// addresses, routes, and routing rules associated with the device in
+	// the root namespace are preserved and applied in the target namespace.
+	rpc MoveDevice(MoveDeviceRequest) returns (MoveDeviceResponse);
+
+	// AssignIPAddress assigns an IP address to an interface within the
+	// pod sandbox's network namespace.
+	rpc AssignIPAddress(AssignIPAddressRequest) returns (AssignIPAddressResponse);
+
+	// ApplyRoute adds a route in the pod sandbox's network namespace.
+	rpc ApplyRoute(ApplyRouteRequest) returns (ApplyRouteResponse);
 }
+
+// DeviceType indicates the kind of device to move into the pod netns.
+enum DeviceType {
+	NETDEV = 0;
+	RDMA = 1;
+}
+
+// ———————————————————————————————————————————————
+// GetPodResources
+// ———————————————————————————————————————————————
 
 message GetPodResourcesRequest {
 	string sandbox_id = 1;
@@ -35,6 +63,10 @@ message GetPodResourcesRequest {
 message GetPodResourcesResponse {
 	string pod_netns_path = 1;
 }
+
+// ———————————————————————————————————————————————
+// GetPodIPs
+// ———————————————————————————————————————————————
 
 message GetPodIPsRequest {
 	string sandbox_id = 1;
@@ -54,3 +86,142 @@ message GetPodIPsResponse {
 	map<string, PodInterfaceIPs> interface_ips = 1;
 	repeated PodRoute routes = 2;
 }
+
+// ———————————————————————————————————————————————
+// GetPodNetwork
+// ———————————————————————————————————————————————
+
+message GetPodNetworkRequest {
+	string sandbox_id = 1;
+}
+
+// NetworkInterface describes a single interface inside the pod netns.
+message NetworkInterface {
+	// Name of the interface (e.g. "eth0", "mlx5_0").
+	string name = 1;
+
+	// MAC address of the interface.
+	string mac_address = 2;
+
+	// Device type (netdev or RDMA).
+	DeviceType type = 3;
+
+	// MTU of the interface.
+	uint32 mtu = 4;
+
+	// Operational state (e.g. "UP", "DOWN").
+	string state = 5;
+
+	// IP addresses assigned to this interface in CIDR notation (e.g. "10.0.0.2/24").
+	repeated string addresses = 6;
+}
+
+// RouteEntry describes a single route inside the pod netns.
+message RouteEntry {
+	// Destination in CIDR notation (e.g. "10.0.0.0/24", "default").
+	string destination = 1;
+
+	// Gateway address. Empty if directly connected.
+	string gateway = 2;
+
+	// Interface name this route is associated with.
+	string interface_name = 3;
+
+	// Route metric / priority.
+	uint32 metric = 4;
+
+	// Route scope (e.g. "link", "global", "host").
+	string scope = 5;
+}
+
+// RoutingRule describes an ip rule entry inside the pod netns.
+message RoutingRule {
+	// Priority of the rule.
+	uint32 priority = 1;
+
+	// Source prefix to match (CIDR), or empty for all.
+	string src = 2;
+
+	// Destination prefix to match (CIDR), or empty for all.
+	string dst = 3;
+
+	// Routing table to use (e.g. "main", "254", a custom table id).
+	string table = 4;
+
+	// Interface name to match on (iif or oif).
+	string iif = 5;
+	string oif = 6;
+}
+
+message GetPodNetworkResponse {
+	// All network interfaces inside the pod.
+	repeated NetworkInterface interfaces = 1;
+
+	// All routes inside the pod netns.
+	repeated RouteEntry routes = 2;
+
+	// All routing rules (ip rules) inside the pod netns.
+	repeated RoutingRule rules = 3;
+}
+
+// ———————————————————————————————————————————————
+// MoveDevice
+// ———————————————————————————————————————————————
+
+message MoveDeviceRequest {
+	// Sandbox to move the device into.
+	string sandbox_id = 1;
+
+	// Name of the device in the root namespace (e.g. "ens4f0", "mlx5_0").
+	string device_name = 2;
+
+	// Type of device.
+	DeviceType device_type = 3;
+
+	// Optional: rename the device inside the pod netns. If empty, keeps the
+	// original name.
+	string target_name = 4;
+}
+
+message MoveDeviceResponse {
+	// The final name of the device inside the pod netns.
+	string device_name = 1;
+
+	// IP addresses that were carried over, in CIDR notation.
+	repeated string addresses = 2;
+
+	// Routes that were carried over.
+	repeated RouteEntry routes = 3;
+
+	// Routing rules that were carried over.
+	repeated RoutingRule rules = 4;
+}
+
+// ———————————————————————————————————————————————
+// AssignIPAddress
+// ———————————————————————————————————————————————
+
+message AssignIPAddressRequest {
+	string sandbox_id = 1;
+
+	// Interface name inside the pod netns.
+	string interface_name = 2;
+
+	// IP address in CIDR notation (e.g. "10.0.0.5/24", "fd00::5/64").
+	string address = 3;
+}
+
+message AssignIPAddressResponse {}
+
+// ———————————————————————————————————————————————
+// ApplyRoute
+// ———————————————————————————————————————————————
+
+message ApplyRouteRequest {
+	string sandbox_id = 1;
+
+	// Route to apply inside the pod netns.
+	RouteEntry route = 2;
+}
+
+message ApplyRouteResponse {}

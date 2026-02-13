@@ -79,3 +79,130 @@ func (r *remotePodResourcesClient) GetPodIPs(ctx context.Context, sandboxID stri
 		Routes:       routes,
 	}, nil
 }
+
+// GetPodNetwork returns the full network state of the given sandbox.
+func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID string) (*pod.PodNetworkState, error) {
+	resp, err := r.client.GetPodNetwork(ctx, &api.GetPodNetworkRequest{
+		SandboxId: sandboxID,
+	})
+	if err != nil {
+		return nil, errgrpc.ToNative(err)
+	}
+
+	state := &pod.PodNetworkState{}
+
+	for _, iface := range resp.Interfaces {
+		devType := pod.NetDev
+		if iface.Type == api.DeviceType_RDMA {
+			devType = pod.RDMA
+		}
+		state.Interfaces = append(state.Interfaces, pod.NetworkInterface{
+			Name:       iface.Name,
+			MACAddress: iface.MacAddress,
+			Type:       devType,
+			MTU:        iface.Mtu,
+			State:      iface.State,
+			Addresses:  iface.Addresses,
+		})
+	}
+
+	for _, rt := range resp.Routes {
+		state.Routes = append(state.Routes, pod.Route{
+			Destination:   rt.Destination,
+			Gateway:       rt.Gateway,
+			InterfaceName: rt.InterfaceName,
+			Metric:        rt.Metric,
+			Scope:         rt.Scope,
+		})
+	}
+
+	for _, rl := range resp.Rules {
+		state.Rules = append(state.Rules, pod.RoutingRule{
+			Priority: rl.Priority,
+			Src:      rl.Src,
+			Dst:      rl.Dst,
+			Table:    rl.Table,
+			IIF:      rl.Iif,
+			OIF:      rl.Oif,
+		})
+	}
+
+	return state, nil
+}
+
+// MoveDevice moves a network device into the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType pod.DeviceType, targetName string) (*pod.MoveDeviceResult, error) {
+	apiType := api.DeviceType_NETDEV
+	if deviceType == pod.RDMA {
+		apiType = api.DeviceType_RDMA
+	}
+
+	resp, err := r.client.MoveDevice(ctx, &api.MoveDeviceRequest{
+		SandboxId:  sandboxID,
+		DeviceName: deviceName,
+		DeviceType: apiType,
+		TargetName: targetName,
+	})
+	if err != nil {
+		return nil, errgrpc.ToNative(err)
+	}
+
+	result := &pod.MoveDeviceResult{
+		DeviceName: resp.DeviceName,
+		Addresses:  resp.Addresses,
+	}
+
+	for _, rt := range resp.Routes {
+		result.Routes = append(result.Routes, pod.Route{
+			Destination:   rt.Destination,
+			Gateway:       rt.Gateway,
+			InterfaceName: rt.InterfaceName,
+			Metric:        rt.Metric,
+			Scope:         rt.Scope,
+		})
+	}
+
+	for _, rl := range resp.Rules {
+		result.Rules = append(result.Rules, pod.RoutingRule{
+			Priority: rl.Priority,
+			Src:      rl.Src,
+			Dst:      rl.Dst,
+			Table:    rl.Table,
+			IIF:      rl.Iif,
+			OIF:      rl.Oif,
+		})
+	}
+
+	return result, nil
+}
+
+// AssignIPAddress assigns an IP address to an interface inside the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) AssignIPAddress(ctx context.Context, sandboxID string, interfaceName string, address string) error {
+	_, err := r.client.AssignIPAddress(ctx, &api.AssignIPAddressRequest{
+		SandboxId:     sandboxID,
+		InterfaceName: interfaceName,
+		Address:       address,
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}
+
+// ApplyRoute adds a route inside the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error {
+	_, err := r.client.ApplyRoute(ctx, &api.ApplyRouteRequest{
+		SandboxId: sandboxID,
+		Route: &api.RouteEntry{
+			Destination:   route.Destination,
+			Gateway:       route.Gateway,
+			InterfaceName: route.InterfaceName,
+			Metric:        route.Metric,
+			Scope:         route.Scope,
+		},
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}

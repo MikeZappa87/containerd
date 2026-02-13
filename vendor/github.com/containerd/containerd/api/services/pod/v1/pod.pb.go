@@ -36,6 +36,53 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// DeviceType indicates the kind of device to move into the pod netns.
+type DeviceType int32
+
+const (
+	DeviceType_NETDEV DeviceType = 0
+	DeviceType_RDMA   DeviceType = 1
+)
+
+// Enum value maps for DeviceType.
+var (
+	DeviceType_name = map[int32]string{
+		0: "NETDEV",
+		1: "RDMA",
+	}
+	DeviceType_value = map[string]int32{
+		"NETDEV": 0,
+		"RDMA":   1,
+	}
+)
+
+func (x DeviceType) Enum() *DeviceType {
+	p := new(DeviceType)
+	*p = x
+	return p
+}
+
+func (x DeviceType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeviceType) Descriptor() protoreflect.EnumDescriptor {
+	return file_services_pod_v1_pod_proto_enumTypes[0].Descriptor()
+}
+
+func (DeviceType) Type() protoreflect.EnumType {
+	return &file_services_pod_v1_pod_proto_enumTypes[0]
+}
+
+func (x DeviceType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeviceType.Descriptor instead.
+func (DeviceType) EnumDescriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{0}
+}
+
 type GetPodResourcesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
@@ -324,6 +371,708 @@ func (x *GetPodIPsResponse) GetRoutes() []*PodRoute {
 	return nil
 }
 
+type GetPodNetworkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPodNetworkRequest) Reset() {
+	*x = GetPodNetworkRequest{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPodNetworkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPodNetworkRequest) ProtoMessage() {}
+
+func (x *GetPodNetworkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPodNetworkRequest.ProtoReflect.Descriptor instead.
+func (*GetPodNetworkRequest) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetPodNetworkRequest) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+// NetworkInterface describes a single interface inside the pod netns.
+type NetworkInterface struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name of the interface (e.g. "eth0", "mlx5_0").
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// MAC address of the interface.
+	MacAddress string `protobuf:"bytes,2,opt,name=mac_address,json=macAddress,proto3" json:"mac_address,omitempty"`
+	// Device type (netdev or RDMA).
+	Type DeviceType `protobuf:"varint,3,opt,name=type,proto3,enum=containerd.services.pod.v1.DeviceType" json:"type,omitempty"`
+	// MTU of the interface.
+	Mtu uint32 `protobuf:"varint,4,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	// Operational state (e.g. "UP", "DOWN").
+	State string `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	// IP addresses assigned to this interface in CIDR notation (e.g. "10.0.0.2/24").
+	Addresses     []string `protobuf:"bytes,6,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkInterface) Reset() {
+	*x = NetworkInterface{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkInterface) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkInterface) ProtoMessage() {}
+
+func (x *NetworkInterface) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkInterface.ProtoReflect.Descriptor instead.
+func (*NetworkInterface) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *NetworkInterface) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *NetworkInterface) GetMacAddress() string {
+	if x != nil {
+		return x.MacAddress
+	}
+	return ""
+}
+
+func (x *NetworkInterface) GetType() DeviceType {
+	if x != nil {
+		return x.Type
+	}
+	return DeviceType_NETDEV
+}
+
+func (x *NetworkInterface) GetMtu() uint32 {
+	if x != nil {
+		return x.Mtu
+	}
+	return 0
+}
+
+func (x *NetworkInterface) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *NetworkInterface) GetAddresses() []string {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
+// RouteEntry describes a single route inside the pod netns.
+type RouteEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Destination in CIDR notation (e.g. "10.0.0.0/24", "default").
+	Destination string `protobuf:"bytes,1,opt,name=destination,proto3" json:"destination,omitempty"`
+	// Gateway address. Empty if directly connected.
+	Gateway string `protobuf:"bytes,2,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	// Interface name this route is associated with.
+	InterfaceName string `protobuf:"bytes,3,opt,name=interface_name,json=interfaceName,proto3" json:"interface_name,omitempty"`
+	// Route metric / priority.
+	Metric uint32 `protobuf:"varint,4,opt,name=metric,proto3" json:"metric,omitempty"`
+	// Route scope (e.g. "link", "global", "host").
+	Scope         string `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RouteEntry) Reset() {
+	*x = RouteEntry{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RouteEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RouteEntry) ProtoMessage() {}
+
+func (x *RouteEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RouteEntry.ProtoReflect.Descriptor instead.
+func (*RouteEntry) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RouteEntry) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RouteEntry) GetGateway() string {
+	if x != nil {
+		return x.Gateway
+	}
+	return ""
+}
+
+func (x *RouteEntry) GetInterfaceName() string {
+	if x != nil {
+		return x.InterfaceName
+	}
+	return ""
+}
+
+func (x *RouteEntry) GetMetric() uint32 {
+	if x != nil {
+		return x.Metric
+	}
+	return 0
+}
+
+func (x *RouteEntry) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+// RoutingRule describes an ip rule entry inside the pod netns.
+type RoutingRule struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Priority of the rule.
+	Priority uint32 `protobuf:"varint,1,opt,name=priority,proto3" json:"priority,omitempty"`
+	// Source prefix to match (CIDR), or empty for all.
+	Src string `protobuf:"bytes,2,opt,name=src,proto3" json:"src,omitempty"`
+	// Destination prefix to match (CIDR), or empty for all.
+	Dst string `protobuf:"bytes,3,opt,name=dst,proto3" json:"dst,omitempty"`
+	// Routing table to use (e.g. "main", "254", a custom table id).
+	Table string `protobuf:"bytes,4,opt,name=table,proto3" json:"table,omitempty"`
+	// Interface name to match on (iif or oif).
+	Iif           string `protobuf:"bytes,5,opt,name=iif,proto3" json:"iif,omitempty"`
+	Oif           string `protobuf:"bytes,6,opt,name=oif,proto3" json:"oif,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoutingRule) Reset() {
+	*x = RoutingRule{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoutingRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoutingRule) ProtoMessage() {}
+
+func (x *RoutingRule) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoutingRule.ProtoReflect.Descriptor instead.
+func (*RoutingRule) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RoutingRule) GetPriority() uint32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *RoutingRule) GetSrc() string {
+	if x != nil {
+		return x.Src
+	}
+	return ""
+}
+
+func (x *RoutingRule) GetDst() string {
+	if x != nil {
+		return x.Dst
+	}
+	return ""
+}
+
+func (x *RoutingRule) GetTable() string {
+	if x != nil {
+		return x.Table
+	}
+	return ""
+}
+
+func (x *RoutingRule) GetIif() string {
+	if x != nil {
+		return x.Iif
+	}
+	return ""
+}
+
+func (x *RoutingRule) GetOif() string {
+	if x != nil {
+		return x.Oif
+	}
+	return ""
+}
+
+type GetPodNetworkResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// All network interfaces inside the pod.
+	Interfaces []*NetworkInterface `protobuf:"bytes,1,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	// All routes inside the pod netns.
+	Routes []*RouteEntry `protobuf:"bytes,2,rep,name=routes,proto3" json:"routes,omitempty"`
+	// All routing rules (ip rules) inside the pod netns.
+	Rules         []*RoutingRule `protobuf:"bytes,3,rep,name=rules,proto3" json:"rules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPodNetworkResponse) Reset() {
+	*x = GetPodNetworkResponse{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPodNetworkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPodNetworkResponse) ProtoMessage() {}
+
+func (x *GetPodNetworkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPodNetworkResponse.ProtoReflect.Descriptor instead.
+func (*GetPodNetworkResponse) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetPodNetworkResponse) GetInterfaces() []*NetworkInterface {
+	if x != nil {
+		return x.Interfaces
+	}
+	return nil
+}
+
+func (x *GetPodNetworkResponse) GetRoutes() []*RouteEntry {
+	if x != nil {
+		return x.Routes
+	}
+	return nil
+}
+
+func (x *GetPodNetworkResponse) GetRules() []*RoutingRule {
+	if x != nil {
+		return x.Rules
+	}
+	return nil
+}
+
+type MoveDeviceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Sandbox to move the device into.
+	SandboxId string `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// Name of the device in the root namespace (e.g. "ens4f0", "mlx5_0").
+	DeviceName string `protobuf:"bytes,2,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	// Type of device.
+	DeviceType DeviceType `protobuf:"varint,3,opt,name=device_type,json=deviceType,proto3,enum=containerd.services.pod.v1.DeviceType" json:"device_type,omitempty"`
+	// Optional: rename the device inside the pod netns. If empty, keeps the
+	// original name.
+	TargetName    string `protobuf:"bytes,4,opt,name=target_name,json=targetName,proto3" json:"target_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveDeviceRequest) Reset() {
+	*x = MoveDeviceRequest{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveDeviceRequest) ProtoMessage() {}
+
+func (x *MoveDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveDeviceRequest.ProtoReflect.Descriptor instead.
+func (*MoveDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MoveDeviceRequest) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *MoveDeviceRequest) GetDeviceName() string {
+	if x != nil {
+		return x.DeviceName
+	}
+	return ""
+}
+
+func (x *MoveDeviceRequest) GetDeviceType() DeviceType {
+	if x != nil {
+		return x.DeviceType
+	}
+	return DeviceType_NETDEV
+}
+
+func (x *MoveDeviceRequest) GetTargetName() string {
+	if x != nil {
+		return x.TargetName
+	}
+	return ""
+}
+
+type MoveDeviceResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The final name of the device inside the pod netns.
+	DeviceName string `protobuf:"bytes,1,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	// IP addresses that were carried over, in CIDR notation.
+	Addresses []string `protobuf:"bytes,2,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	// Routes that were carried over.
+	Routes []*RouteEntry `protobuf:"bytes,3,rep,name=routes,proto3" json:"routes,omitempty"`
+	// Routing rules that were carried over.
+	Rules         []*RoutingRule `protobuf:"bytes,4,rep,name=rules,proto3" json:"rules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveDeviceResponse) Reset() {
+	*x = MoveDeviceResponse{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveDeviceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveDeviceResponse) ProtoMessage() {}
+
+func (x *MoveDeviceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveDeviceResponse.ProtoReflect.Descriptor instead.
+func (*MoveDeviceResponse) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *MoveDeviceResponse) GetDeviceName() string {
+	if x != nil {
+		return x.DeviceName
+	}
+	return ""
+}
+
+func (x *MoveDeviceResponse) GetAddresses() []string {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
+func (x *MoveDeviceResponse) GetRoutes() []*RouteEntry {
+	if x != nil {
+		return x.Routes
+	}
+	return nil
+}
+
+func (x *MoveDeviceResponse) GetRules() []*RoutingRule {
+	if x != nil {
+		return x.Rules
+	}
+	return nil
+}
+
+type AssignIPAddressRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// Interface name inside the pod netns.
+	InterfaceName string `protobuf:"bytes,2,opt,name=interface_name,json=interfaceName,proto3" json:"interface_name,omitempty"`
+	// IP address in CIDR notation (e.g. "10.0.0.5/24", "fd00::5/64").
+	Address       string `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignIPAddressRequest) Reset() {
+	*x = AssignIPAddressRequest{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignIPAddressRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignIPAddressRequest) ProtoMessage() {}
+
+func (x *AssignIPAddressRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignIPAddressRequest.ProtoReflect.Descriptor instead.
+func (*AssignIPAddressRequest) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AssignIPAddressRequest) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *AssignIPAddressRequest) GetInterfaceName() string {
+	if x != nil {
+		return x.InterfaceName
+	}
+	return ""
+}
+
+func (x *AssignIPAddressRequest) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+type AssignIPAddressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignIPAddressResponse) Reset() {
+	*x = AssignIPAddressResponse{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignIPAddressResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignIPAddressResponse) ProtoMessage() {}
+
+func (x *AssignIPAddressResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignIPAddressResponse.ProtoReflect.Descriptor instead.
+func (*AssignIPAddressResponse) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{14}
+}
+
+type ApplyRouteRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// Route to apply inside the pod netns.
+	Route         *RouteEntry `protobuf:"bytes,2,opt,name=route,proto3" json:"route,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyRouteRequest) Reset() {
+	*x = ApplyRouteRequest{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyRouteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyRouteRequest) ProtoMessage() {}
+
+func (x *ApplyRouteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyRouteRequest.ProtoReflect.Descriptor instead.
+func (*ApplyRouteRequest) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ApplyRouteRequest) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *ApplyRouteRequest) GetRoute() *RouteEntry {
+	if x != nil {
+		return x.Route
+	}
+	return nil
+}
+
+type ApplyRouteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyRouteResponse) Reset() {
+	*x = ApplyRouteResponse{}
+	mi := &file_services_pod_v1_pod_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyRouteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyRouteResponse) ProtoMessage() {}
+
+func (x *ApplyRouteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_pod_v1_pod_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyRouteResponse.ProtoReflect.Descriptor instead.
+func (*ApplyRouteResponse) Descriptor() ([]byte, []int) {
+	return file_services_pod_v1_pod_proto_rawDescGZIP(), []int{16}
+}
+
 var File_services_pod_v1_pod_proto protoreflect.FileDescriptor
 
 const file_services_pod_v1_pod_proto_rawDesc = "" +
@@ -348,10 +1097,78 @@ const file_services_pod_v1_pod_proto_rawDesc = "" +
 	"\x06routes\x18\x02 \x03(\v2$.containerd.services.pod.v1.PodRouteR\x06routes\x1al\n" +
 	"\x11InterfaceIpsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12A\n" +
-	"\x05value\x18\x02 \x01(\v2+.containerd.services.pod.v1.PodInterfaceIPsR\x05value:\x028\x012\xeb\x01\n" +
+	"\x05value\x18\x02 \x01(\v2+.containerd.services.pod.v1.PodInterfaceIPsR\x05value:\x028\x01\"5\n" +
+	"\x14GetPodNetworkRequest\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\"\xc9\x01\n" +
+	"\x10NetworkInterface\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
+	"\vmac_address\x18\x02 \x01(\tR\n" +
+	"macAddress\x12:\n" +
+	"\x04type\x18\x03 \x01(\x0e2&.containerd.services.pod.v1.DeviceTypeR\x04type\x12\x10\n" +
+	"\x03mtu\x18\x04 \x01(\rR\x03mtu\x12\x14\n" +
+	"\x05state\x18\x05 \x01(\tR\x05state\x12\x1c\n" +
+	"\taddresses\x18\x06 \x03(\tR\taddresses\"\x9d\x01\n" +
+	"\n" +
+	"RouteEntry\x12 \n" +
+	"\vdestination\x18\x01 \x01(\tR\vdestination\x12\x18\n" +
+	"\agateway\x18\x02 \x01(\tR\agateway\x12%\n" +
+	"\x0einterface_name\x18\x03 \x01(\tR\rinterfaceName\x12\x16\n" +
+	"\x06metric\x18\x04 \x01(\rR\x06metric\x12\x14\n" +
+	"\x05scope\x18\x05 \x01(\tR\x05scope\"\x87\x01\n" +
+	"\vRoutingRule\x12\x1a\n" +
+	"\bpriority\x18\x01 \x01(\rR\bpriority\x12\x10\n" +
+	"\x03src\x18\x02 \x01(\tR\x03src\x12\x10\n" +
+	"\x03dst\x18\x03 \x01(\tR\x03dst\x12\x14\n" +
+	"\x05table\x18\x04 \x01(\tR\x05table\x12\x10\n" +
+	"\x03iif\x18\x05 \x01(\tR\x03iif\x12\x10\n" +
+	"\x03oif\x18\x06 \x01(\tR\x03oif\"\xe4\x01\n" +
+	"\x15GetPodNetworkResponse\x12L\n" +
+	"\n" +
+	"interfaces\x18\x01 \x03(\v2,.containerd.services.pod.v1.NetworkInterfaceR\n" +
+	"interfaces\x12>\n" +
+	"\x06routes\x18\x02 \x03(\v2&.containerd.services.pod.v1.RouteEntryR\x06routes\x12=\n" +
+	"\x05rules\x18\x03 \x03(\v2'.containerd.services.pod.v1.RoutingRuleR\x05rules\"\xbd\x01\n" +
+	"\x11MoveDeviceRequest\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x1f\n" +
+	"\vdevice_name\x18\x02 \x01(\tR\n" +
+	"deviceName\x12G\n" +
+	"\vdevice_type\x18\x03 \x01(\x0e2&.containerd.services.pod.v1.DeviceTypeR\n" +
+	"deviceType\x12\x1f\n" +
+	"\vtarget_name\x18\x04 \x01(\tR\n" +
+	"targetName\"\xd2\x01\n" +
+	"\x12MoveDeviceResponse\x12\x1f\n" +
+	"\vdevice_name\x18\x01 \x01(\tR\n" +
+	"deviceName\x12\x1c\n" +
+	"\taddresses\x18\x02 \x03(\tR\taddresses\x12>\n" +
+	"\x06routes\x18\x03 \x03(\v2&.containerd.services.pod.v1.RouteEntryR\x06routes\x12=\n" +
+	"\x05rules\x18\x04 \x03(\v2'.containerd.services.pod.v1.RoutingRuleR\x05rules\"x\n" +
+	"\x16AssignIPAddressRequest\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12%\n" +
+	"\x0einterface_name\x18\x02 \x01(\tR\rinterfaceName\x12\x18\n" +
+	"\aaddress\x18\x03 \x01(\tR\aaddress\"\x19\n" +
+	"\x17AssignIPAddressResponse\"p\n" +
+	"\x11ApplyRouteRequest\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12<\n" +
+	"\x05route\x18\x02 \x01(\v2&.containerd.services.pod.v1.RouteEntryR\x05route\"\x14\n" +
+	"\x12ApplyRouteResponse*\"\n" +
+	"\n" +
+	"DeviceType\x12\n" +
+	"\n" +
+	"\x06NETDEV\x10\x00\x12\b\n" +
+	"\x04RDMA\x10\x012\xb7\x05\n" +
 	"\x03Pod\x12z\n" +
 	"\x0fGetPodResources\x122.containerd.services.pod.v1.GetPodResourcesRequest\x1a3.containerd.services.pod.v1.GetPodResourcesResponse\x12h\n" +
-	"\tGetPodIPs\x12,.containerd.services.pod.v1.GetPodIPsRequest\x1a-.containerd.services.pod.v1.GetPodIPsResponseB:Z8github.com/containerd/containerd/api/services/pod/v1;podb\x06proto3"
+	"\tGetPodIPs\x12,.containerd.services.pod.v1.GetPodIPsRequest\x1a-.containerd.services.pod.v1.GetPodIPsResponse\x12t\n" +
+	"\rGetPodNetwork\x120.containerd.services.pod.v1.GetPodNetworkRequest\x1a1.containerd.services.pod.v1.GetPodNetworkResponse\x12k\n" +
+	"\n" +
+	"MoveDevice\x12-.containerd.services.pod.v1.MoveDeviceRequest\x1a..containerd.services.pod.v1.MoveDeviceResponse\x12z\n" +
+	"\x0fAssignIPAddress\x122.containerd.services.pod.v1.AssignIPAddressRequest\x1a3.containerd.services.pod.v1.AssignIPAddressResponse\x12k\n" +
+	"\n" +
+	"ApplyRoute\x12-.containerd.services.pod.v1.ApplyRouteRequest\x1a..containerd.services.pod.v1.ApplyRouteResponseB:Z8github.com/containerd/containerd/api/services/pod/v1;podb\x06proto3"
 
 var (
 	file_services_pod_v1_pod_proto_rawDescOnce sync.Once
@@ -365,29 +1182,58 @@ func file_services_pod_v1_pod_proto_rawDescGZIP() []byte {
 	return file_services_pod_v1_pod_proto_rawDescData
 }
 
-var file_services_pod_v1_pod_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_services_pod_v1_pod_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_services_pod_v1_pod_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_services_pod_v1_pod_proto_goTypes = []any{
-	(*GetPodResourcesRequest)(nil),  // 0: containerd.services.pod.v1.GetPodResourcesRequest
-	(*GetPodResourcesResponse)(nil), // 1: containerd.services.pod.v1.GetPodResourcesResponse
-	(*GetPodIPsRequest)(nil),        // 2: containerd.services.pod.v1.GetPodIPsRequest
-	(*PodInterfaceIPs)(nil),         // 3: containerd.services.pod.v1.PodInterfaceIPs
-	(*PodRoute)(nil),                // 4: containerd.services.pod.v1.PodRoute
-	(*GetPodIPsResponse)(nil),       // 5: containerd.services.pod.v1.GetPodIPsResponse
-	nil,                             // 6: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
+	(DeviceType)(0),                 // 0: containerd.services.pod.v1.DeviceType
+	(*GetPodResourcesRequest)(nil),  // 1: containerd.services.pod.v1.GetPodResourcesRequest
+	(*GetPodResourcesResponse)(nil), // 2: containerd.services.pod.v1.GetPodResourcesResponse
+	(*GetPodIPsRequest)(nil),        // 3: containerd.services.pod.v1.GetPodIPsRequest
+	(*PodInterfaceIPs)(nil),         // 4: containerd.services.pod.v1.PodInterfaceIPs
+	(*PodRoute)(nil),                // 5: containerd.services.pod.v1.PodRoute
+	(*GetPodIPsResponse)(nil),       // 6: containerd.services.pod.v1.GetPodIPsResponse
+	(*GetPodNetworkRequest)(nil),    // 7: containerd.services.pod.v1.GetPodNetworkRequest
+	(*NetworkInterface)(nil),        // 8: containerd.services.pod.v1.NetworkInterface
+	(*RouteEntry)(nil),              // 9: containerd.services.pod.v1.RouteEntry
+	(*RoutingRule)(nil),             // 10: containerd.services.pod.v1.RoutingRule
+	(*GetPodNetworkResponse)(nil),   // 11: containerd.services.pod.v1.GetPodNetworkResponse
+	(*MoveDeviceRequest)(nil),       // 12: containerd.services.pod.v1.MoveDeviceRequest
+	(*MoveDeviceResponse)(nil),      // 13: containerd.services.pod.v1.MoveDeviceResponse
+	(*AssignIPAddressRequest)(nil),  // 14: containerd.services.pod.v1.AssignIPAddressRequest
+	(*AssignIPAddressResponse)(nil), // 15: containerd.services.pod.v1.AssignIPAddressResponse
+	(*ApplyRouteRequest)(nil),       // 16: containerd.services.pod.v1.ApplyRouteRequest
+	(*ApplyRouteResponse)(nil),      // 17: containerd.services.pod.v1.ApplyRouteResponse
+	nil,                             // 18: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
 }
 var file_services_pod_v1_pod_proto_depIdxs = []int32{
-	6, // 0: containerd.services.pod.v1.GetPodIPsResponse.interface_ips:type_name -> containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
-	4, // 1: containerd.services.pod.v1.GetPodIPsResponse.routes:type_name -> containerd.services.pod.v1.PodRoute
-	3, // 2: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry.value:type_name -> containerd.services.pod.v1.PodInterfaceIPs
-	0, // 3: containerd.services.pod.v1.Pod.GetPodResources:input_type -> containerd.services.pod.v1.GetPodResourcesRequest
-	2, // 4: containerd.services.pod.v1.Pod.GetPodIPs:input_type -> containerd.services.pod.v1.GetPodIPsRequest
-	1, // 5: containerd.services.pod.v1.Pod.GetPodResources:output_type -> containerd.services.pod.v1.GetPodResourcesResponse
-	5, // 6: containerd.services.pod.v1.Pod.GetPodIPs:output_type -> containerd.services.pod.v1.GetPodIPsResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	18, // 0: containerd.services.pod.v1.GetPodIPsResponse.interface_ips:type_name -> containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry
+	5,  // 1: containerd.services.pod.v1.GetPodIPsResponse.routes:type_name -> containerd.services.pod.v1.PodRoute
+	0,  // 2: containerd.services.pod.v1.NetworkInterface.type:type_name -> containerd.services.pod.v1.DeviceType
+	8,  // 3: containerd.services.pod.v1.GetPodNetworkResponse.interfaces:type_name -> containerd.services.pod.v1.NetworkInterface
+	9,  // 4: containerd.services.pod.v1.GetPodNetworkResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
+	10, // 5: containerd.services.pod.v1.GetPodNetworkResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
+	0,  // 6: containerd.services.pod.v1.MoveDeviceRequest.device_type:type_name -> containerd.services.pod.v1.DeviceType
+	9,  // 7: containerd.services.pod.v1.MoveDeviceResponse.routes:type_name -> containerd.services.pod.v1.RouteEntry
+	10, // 8: containerd.services.pod.v1.MoveDeviceResponse.rules:type_name -> containerd.services.pod.v1.RoutingRule
+	9,  // 9: containerd.services.pod.v1.ApplyRouteRequest.route:type_name -> containerd.services.pod.v1.RouteEntry
+	4,  // 10: containerd.services.pod.v1.GetPodIPsResponse.InterfaceIpsEntry.value:type_name -> containerd.services.pod.v1.PodInterfaceIPs
+	1,  // 11: containerd.services.pod.v1.Pod.GetPodResources:input_type -> containerd.services.pod.v1.GetPodResourcesRequest
+	3,  // 12: containerd.services.pod.v1.Pod.GetPodIPs:input_type -> containerd.services.pod.v1.GetPodIPsRequest
+	7,  // 13: containerd.services.pod.v1.Pod.GetPodNetwork:input_type -> containerd.services.pod.v1.GetPodNetworkRequest
+	12, // 14: containerd.services.pod.v1.Pod.MoveDevice:input_type -> containerd.services.pod.v1.MoveDeviceRequest
+	14, // 15: containerd.services.pod.v1.Pod.AssignIPAddress:input_type -> containerd.services.pod.v1.AssignIPAddressRequest
+	16, // 16: containerd.services.pod.v1.Pod.ApplyRoute:input_type -> containerd.services.pod.v1.ApplyRouteRequest
+	2,  // 17: containerd.services.pod.v1.Pod.GetPodResources:output_type -> containerd.services.pod.v1.GetPodResourcesResponse
+	6,  // 18: containerd.services.pod.v1.Pod.GetPodIPs:output_type -> containerd.services.pod.v1.GetPodIPsResponse
+	11, // 19: containerd.services.pod.v1.Pod.GetPodNetwork:output_type -> containerd.services.pod.v1.GetPodNetworkResponse
+	13, // 20: containerd.services.pod.v1.Pod.MoveDevice:output_type -> containerd.services.pod.v1.MoveDeviceResponse
+	15, // 21: containerd.services.pod.v1.Pod.AssignIPAddress:output_type -> containerd.services.pod.v1.AssignIPAddressResponse
+	17, // 22: containerd.services.pod.v1.Pod.ApplyRoute:output_type -> containerd.services.pod.v1.ApplyRouteResponse
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_services_pod_v1_pod_proto_init() }
@@ -400,13 +1246,14 @@ func file_services_pod_v1_pod_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_pod_v1_pod_proto_rawDesc), len(file_services_pod_v1_pod_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   7,
+			NumEnums:      1,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_services_pod_v1_pod_proto_goTypes,
 		DependencyIndexes: file_services_pod_v1_pod_proto_depIdxs,
+		EnumInfos:         file_services_pod_v1_pod_proto_enumTypes,
 		MessageInfos:      file_services_pod_v1_pod_proto_msgTypes,
 	}.Build()
 	File_services_pod_v1_pod_proto = out.File
