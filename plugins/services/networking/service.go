@@ -349,7 +349,7 @@ func (s *podService) ApplyRoute(ctx context.Context, req *api.ApplyRouteRequest)
 		Scope:         req.Route.Scope,
 	}
 
-	if err := s.provider.ApplyRoute(ctx, req.SandboxId, rt); err != nil {
+	if err := s.provider.ApplyRoute(ctx, req.SandboxId, rt, req.HostNetwork); err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
 
@@ -373,7 +373,7 @@ func (s *podService) ApplyRule(ctx context.Context, req *api.ApplyRuleRequest) (
 		OIF:      req.Rule.Oif,
 	}
 
-	if err := s.provider.ApplyRule(ctx, req.SandboxId, rl); err != nil {
+	if err := s.provider.ApplyRule(ctx, req.SandboxId, rl, req.HostNetwork); err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
 

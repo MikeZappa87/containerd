@@ -230,6 +230,10 @@ message ApplyRouteRequest {
 
 	// Route to apply inside the pod netns.
 	RouteEntry route = 2;
+
+	// When true, the route is applied in the host (root) network namespace
+	// instead of the pod's netns. Defaults to false (pod netns).
+	bool host_network = 3;
 }
 
 message ApplyRouteResponse {}
@@ -243,6 +247,10 @@ message ApplyRuleRequest {
 
 	// Rule to apply inside the pod netns.
 	RoutingRule rule = 2;
+
+	// When true, the rule is applied in the host (root) network namespace
+	// instead of the pod's netns. Defaults to false (pod netns).
+	bool host_network = 3;
 }
 
 message ApplyRuleResponse {}

@@ -190,7 +190,7 @@ func (r *remotePodResourcesClient) AssignIPAddress(ctx context.Context, sandboxI
 }
 
 // ApplyRoute adds a route inside the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route) error {
+func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route, hostNetwork bool) error {
 	_, err := r.client.ApplyRoute(ctx, &api.ApplyRouteRequest{
 		SandboxId: sandboxID,
 		Route: &api.RouteEntry{
@@ -200,6 +200,7 @@ func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID str
 			Metric:        route.Metric,
 			Scope:         route.Scope,
 		},
+		HostNetwork: hostNetwork,
 	})
 	if err != nil {
 		return errgrpc.ToNative(err)
@@ -208,7 +209,7 @@ func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID str
 }
 
 // ApplyRule adds an ip rule inside the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule) error {
+func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule, hostNetwork bool) error {
 	_, err := r.client.ApplyRule(ctx, &api.ApplyRuleRequest{
 		SandboxId: sandboxID,
 		Rule: &api.RoutingRule{
@@ -219,6 +220,7 @@ func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID stri
 			Iif:      rule.IIF,
 			Oif:      rule.OIF,
 		},
+		HostNetwork: hostNetwork,
 	})
 	if err != nil {
 		return errgrpc.ToNative(err)

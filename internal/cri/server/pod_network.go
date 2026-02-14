@@ -90,17 +90,19 @@ func (c *criService) AssignIPAddress(ctx context.Context, sandboxID string, inte
 	})
 }
 
-// ApplyRoute adds a route inside the pod's network namespace.
-func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route) error {
+// ApplyRoute adds a route. By default it operates inside the pod's network
+// namespace. When hostNetwork is true the route is applied in the host (root)
+// network namespace instead; the sandbox ID is still validated for authorization.
+func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route, hostNetwork bool) error {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
 	}
-	if sb.NetNSPath == "" {
+	if !hostNetwork && sb.NetNSPath == "" {
 		return fmt.Errorf("sandbox %q has no network namespace", sandboxID)
 	}
 
-	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+	addRoute := func() error {
 		nlRoute := netlink.Route{}
 
 		// Parse destination.
@@ -144,20 +146,29 @@ func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route net
 			return fmt.Errorf("failed to add route: %w", err)
 		}
 		return nil
+	}
+
+	if hostNetwork {
+		return addRoute()
+	}
+	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+		return addRoute()
 	})
 }
 
-// ApplyRule adds an ip rule inside the pod's network namespace.
-func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule) error {
+// ApplyRule adds an ip rule. By default it operates inside the pod's network
+// namespace. When hostNetwork is true the rule is applied in the host (root)
+// network namespace instead; the sandbox ID is still validated for authorization.
+func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule, hostNetwork bool) error {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
 	}
-	if sb.NetNSPath == "" {
+	if !hostNetwork && sb.NetNSPath == "" {
 		return fmt.Errorf("sandbox %q has no network namespace", sandboxID)
 	}
 
-	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+	addRule := func() error {
 		nlRule := netlink.NewRule()
 
 		nlRule.Priority = int(rule.Priority)
@@ -193,6 +204,13 @@ func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule netwo
 			return fmt.Errorf("failed to add rule: %w", err)
 		}
 		return nil
+	}
+
+	if hostNetwork {
+		return addRule()
+	}
+	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+		return addRule()
 	})
 }
 
