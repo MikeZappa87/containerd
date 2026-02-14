@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.12.4
-// source: services/pod/v1/pod.proto
+// source: services/networking/v1/networking.proto
 
-package pod
+package networking
 
 import (
 	context "context"
@@ -18,10 +18,10 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// PodClient is the client API for Pod service.
+// PodNetworkClient is the client API for PodNetwork service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PodClient interface {
+type PodNetworkClient interface {
 	// GetPodResources returns resources associated with a pod sandbox.
 	GetPodResources(ctx context.Context, in *GetPodResourcesRequest, opts ...grpc.CallOption) (*GetPodResourcesResponse, error)
 	// GetPodIPs returns the IP addresses assigned to a pod sandbox.
@@ -47,90 +47,90 @@ type PodClient interface {
 	CreateNetdev(ctx context.Context, in *CreateNetdevRequest, opts ...grpc.CallOption) (*CreateNetdevResponse, error)
 }
 
-type podClient struct {
+type podNetworkClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPodClient(cc grpc.ClientConnInterface) PodClient {
-	return &podClient{cc}
+func NewPodNetworkClient(cc grpc.ClientConnInterface) PodNetworkClient {
+	return &podNetworkClient{cc}
 }
 
-func (c *podClient) GetPodResources(ctx context.Context, in *GetPodResourcesRequest, opts ...grpc.CallOption) (*GetPodResourcesResponse, error) {
+func (c *podNetworkClient) GetPodResources(ctx context.Context, in *GetPodResourcesRequest, opts ...grpc.CallOption) (*GetPodResourcesResponse, error) {
 	out := new(GetPodResourcesResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/GetPodResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/GetPodResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) GetPodIPs(ctx context.Context, in *GetPodIPsRequest, opts ...grpc.CallOption) (*GetPodIPsResponse, error) {
+func (c *podNetworkClient) GetPodIPs(ctx context.Context, in *GetPodIPsRequest, opts ...grpc.CallOption) (*GetPodIPsResponse, error) {
 	out := new(GetPodIPsResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/GetPodIPs", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/GetPodIPs", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) GetPodNetwork(ctx context.Context, in *GetPodNetworkRequest, opts ...grpc.CallOption) (*GetPodNetworkResponse, error) {
+func (c *podNetworkClient) GetPodNetwork(ctx context.Context, in *GetPodNetworkRequest, opts ...grpc.CallOption) (*GetPodNetworkResponse, error) {
 	out := new(GetPodNetworkResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/GetPodNetwork", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/GetPodNetwork", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) MoveDevice(ctx context.Context, in *MoveDeviceRequest, opts ...grpc.CallOption) (*MoveDeviceResponse, error) {
+func (c *podNetworkClient) MoveDevice(ctx context.Context, in *MoveDeviceRequest, opts ...grpc.CallOption) (*MoveDeviceResponse, error) {
 	out := new(MoveDeviceResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/MoveDevice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/MoveDevice", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) AssignIPAddress(ctx context.Context, in *AssignIPAddressRequest, opts ...grpc.CallOption) (*AssignIPAddressResponse, error) {
+func (c *podNetworkClient) AssignIPAddress(ctx context.Context, in *AssignIPAddressRequest, opts ...grpc.CallOption) (*AssignIPAddressResponse, error) {
 	out := new(AssignIPAddressResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/AssignIPAddress", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/AssignIPAddress", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) ApplyRoute(ctx context.Context, in *ApplyRouteRequest, opts ...grpc.CallOption) (*ApplyRouteResponse, error) {
+func (c *podNetworkClient) ApplyRoute(ctx context.Context, in *ApplyRouteRequest, opts ...grpc.CallOption) (*ApplyRouteResponse, error) {
 	out := new(ApplyRouteResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/ApplyRoute", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/ApplyRoute", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) ApplyRule(ctx context.Context, in *ApplyRuleRequest, opts ...grpc.CallOption) (*ApplyRuleResponse, error) {
+func (c *podNetworkClient) ApplyRule(ctx context.Context, in *ApplyRuleRequest, opts ...grpc.CallOption) (*ApplyRuleResponse, error) {
 	out := new(ApplyRuleResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/ApplyRule", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/ApplyRule", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *podClient) CreateNetdev(ctx context.Context, in *CreateNetdevRequest, opts ...grpc.CallOption) (*CreateNetdevResponse, error) {
+func (c *podNetworkClient) CreateNetdev(ctx context.Context, in *CreateNetdevRequest, opts ...grpc.CallOption) (*CreateNetdevResponse, error) {
 	out := new(CreateNetdevResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/CreateNetdev", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetwork/CreateNetdev", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// PodServer is the server API for Pod service.
-// All implementations must embed UnimplementedPodServer
+// PodNetworkServer is the server API for PodNetwork service.
+// All implementations must embed UnimplementedPodNetworkServer
 // for forward compatibility
-type PodServer interface {
+type PodNetworkServer interface {
 	// GetPodResources returns resources associated with a pod sandbox.
 	GetPodResources(context.Context, *GetPodResourcesRequest) (*GetPodResourcesResponse, error)
 	// GetPodIPs returns the IP addresses assigned to a pod sandbox.
@@ -154,234 +154,234 @@ type PodServer interface {
 	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
 	// and macvlan device types.
 	CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error)
-	mustEmbedUnimplementedPodServer()
+	mustEmbedUnimplementedPodNetworkServer()
 }
 
-// UnimplementedPodServer must be embedded to have forward compatible implementations.
-type UnimplementedPodServer struct {
+// UnimplementedPodNetworkServer must be embedded to have forward compatible implementations.
+type UnimplementedPodNetworkServer struct {
 }
 
-func (UnimplementedPodServer) GetPodResources(context.Context, *GetPodResourcesRequest) (*GetPodResourcesResponse, error) {
+func (UnimplementedPodNetworkServer) GetPodResources(context.Context, *GetPodResourcesRequest) (*GetPodResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPodResources not implemented")
 }
-func (UnimplementedPodServer) GetPodIPs(context.Context, *GetPodIPsRequest) (*GetPodIPsResponse, error) {
+func (UnimplementedPodNetworkServer) GetPodIPs(context.Context, *GetPodIPsRequest) (*GetPodIPsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPodIPs not implemented")
 }
-func (UnimplementedPodServer) GetPodNetwork(context.Context, *GetPodNetworkRequest) (*GetPodNetworkResponse, error) {
+func (UnimplementedPodNetworkServer) GetPodNetwork(context.Context, *GetPodNetworkRequest) (*GetPodNetworkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPodNetwork not implemented")
 }
-func (UnimplementedPodServer) MoveDevice(context.Context, *MoveDeviceRequest) (*MoveDeviceResponse, error) {
+func (UnimplementedPodNetworkServer) MoveDevice(context.Context, *MoveDeviceRequest) (*MoveDeviceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MoveDevice not implemented")
 }
-func (UnimplementedPodServer) AssignIPAddress(context.Context, *AssignIPAddressRequest) (*AssignIPAddressResponse, error) {
+func (UnimplementedPodNetworkServer) AssignIPAddress(context.Context, *AssignIPAddressRequest) (*AssignIPAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssignIPAddress not implemented")
 }
-func (UnimplementedPodServer) ApplyRoute(context.Context, *ApplyRouteRequest) (*ApplyRouteResponse, error) {
+func (UnimplementedPodNetworkServer) ApplyRoute(context.Context, *ApplyRouteRequest) (*ApplyRouteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApplyRoute not implemented")
 }
-func (UnimplementedPodServer) ApplyRule(context.Context, *ApplyRuleRequest) (*ApplyRuleResponse, error) {
+func (UnimplementedPodNetworkServer) ApplyRule(context.Context, *ApplyRuleRequest) (*ApplyRuleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApplyRule not implemented")
 }
-func (UnimplementedPodServer) CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error) {
+func (UnimplementedPodNetworkServer) CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNetdev not implemented")
 }
-func (UnimplementedPodServer) mustEmbedUnimplementedPodServer() {}
+func (UnimplementedPodNetworkServer) mustEmbedUnimplementedPodNetworkServer() {}
 
-// UnsafePodServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PodServer will
+// UnsafePodNetworkServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PodNetworkServer will
 // result in compilation errors.
-type UnsafePodServer interface {
-	mustEmbedUnimplementedPodServer()
+type UnsafePodNetworkServer interface {
+	mustEmbedUnimplementedPodNetworkServer()
 }
 
-func RegisterPodServer(s grpc.ServiceRegistrar, srv PodServer) {
-	s.RegisterService(&Pod_ServiceDesc, srv)
+func RegisterPodNetworkServer(s grpc.ServiceRegistrar, srv PodNetworkServer) {
+	s.RegisterService(&PodNetwork_ServiceDesc, srv)
 }
 
-func _Pod_GetPodResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_GetPodResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPodResourcesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).GetPodResources(ctx, in)
+		return srv.(PodNetworkServer).GetPodResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/GetPodResources",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/GetPodResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).GetPodResources(ctx, req.(*GetPodResourcesRequest))
+		return srv.(PodNetworkServer).GetPodResources(ctx, req.(*GetPodResourcesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_GetPodIPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_GetPodIPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPodIPsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).GetPodIPs(ctx, in)
+		return srv.(PodNetworkServer).GetPodIPs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/GetPodIPs",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/GetPodIPs",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).GetPodIPs(ctx, req.(*GetPodIPsRequest))
+		return srv.(PodNetworkServer).GetPodIPs(ctx, req.(*GetPodIPsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_GetPodNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_GetPodNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPodNetworkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).GetPodNetwork(ctx, in)
+		return srv.(PodNetworkServer).GetPodNetwork(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/GetPodNetwork",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/GetPodNetwork",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).GetPodNetwork(ctx, req.(*GetPodNetworkRequest))
+		return srv.(PodNetworkServer).GetPodNetwork(ctx, req.(*GetPodNetworkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_MoveDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_MoveDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MoveDeviceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).MoveDevice(ctx, in)
+		return srv.(PodNetworkServer).MoveDevice(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/MoveDevice",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/MoveDevice",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).MoveDevice(ctx, req.(*MoveDeviceRequest))
+		return srv.(PodNetworkServer).MoveDevice(ctx, req.(*MoveDeviceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_AssignIPAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_AssignIPAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AssignIPAddressRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).AssignIPAddress(ctx, in)
+		return srv.(PodNetworkServer).AssignIPAddress(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/AssignIPAddress",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/AssignIPAddress",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).AssignIPAddress(ctx, req.(*AssignIPAddressRequest))
+		return srv.(PodNetworkServer).AssignIPAddress(ctx, req.(*AssignIPAddressRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_ApplyRoute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_ApplyRoute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ApplyRouteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).ApplyRoute(ctx, in)
+		return srv.(PodNetworkServer).ApplyRoute(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/ApplyRoute",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/ApplyRoute",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).ApplyRoute(ctx, req.(*ApplyRouteRequest))
+		return srv.(PodNetworkServer).ApplyRoute(ctx, req.(*ApplyRouteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_ApplyRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_ApplyRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ApplyRuleRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).ApplyRule(ctx, in)
+		return srv.(PodNetworkServer).ApplyRule(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/ApplyRule",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/ApplyRule",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).ApplyRule(ctx, req.(*ApplyRuleRequest))
+		return srv.(PodNetworkServer).ApplyRule(ctx, req.(*ApplyRuleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Pod_CreateNetdev_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PodNetwork_CreateNetdev_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateNetdevRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PodServer).CreateNetdev(ctx, in)
+		return srv.(PodNetworkServer).CreateNetdev(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.pod.v1.Pod/CreateNetdev",
+		FullMethod: "/containerd.services.networking.v1.PodNetwork/CreateNetdev",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PodServer).CreateNetdev(ctx, req.(*CreateNetdevRequest))
+		return srv.(PodNetworkServer).CreateNetdev(ctx, req.(*CreateNetdevRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Pod_ServiceDesc is the grpc.ServiceDesc for Pod service.
+// PodNetwork_ServiceDesc is the grpc.ServiceDesc for PodNetwork service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Pod_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "containerd.services.pod.v1.Pod",
-	HandlerType: (*PodServer)(nil),
+var PodNetwork_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "containerd.services.networking.v1.PodNetwork",
+	HandlerType: (*PodNetworkServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetPodResources",
-			Handler:    _Pod_GetPodResources_Handler,
+			Handler:    _PodNetwork_GetPodResources_Handler,
 		},
 		{
 			MethodName: "GetPodIPs",
-			Handler:    _Pod_GetPodIPs_Handler,
+			Handler:    _PodNetwork_GetPodIPs_Handler,
 		},
 		{
 			MethodName: "GetPodNetwork",
-			Handler:    _Pod_GetPodNetwork_Handler,
+			Handler:    _PodNetwork_GetPodNetwork_Handler,
 		},
 		{
 			MethodName: "MoveDevice",
-			Handler:    _Pod_MoveDevice_Handler,
+			Handler:    _PodNetwork_MoveDevice_Handler,
 		},
 		{
 			MethodName: "AssignIPAddress",
-			Handler:    _Pod_AssignIPAddress_Handler,
+			Handler:    _PodNetwork_AssignIPAddress_Handler,
 		},
 		{
 			MethodName: "ApplyRoute",
-			Handler:    _Pod_ApplyRoute_Handler,
+			Handler:    _PodNetwork_ApplyRoute_Handler,
 		},
 		{
 			MethodName: "ApplyRule",
-			Handler:    _Pod_ApplyRule_Handler,
+			Handler:    _PodNetwork_ApplyRule_Handler,
 		},
 		{
 			MethodName: "CreateNetdev",
-			Handler:    _Pod_CreateNetdev_Handler,
+			Handler:    _PodNetwork_CreateNetdev_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "services/pod/v1/pod.proto",
+	Metadata: "services/networking/v1/networking.proto",
 }

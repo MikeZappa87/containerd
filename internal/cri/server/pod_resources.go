@@ -24,7 +24,7 @@ import (
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/containerd/containerd/v2/core/pod"
+	"github.com/containerd/containerd/v2/core/networking"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
@@ -34,19 +34,19 @@ type PodResourcesProvider interface {
 	// GetPodResources returns the network namespace path for the sandbox.
 	GetPodResources(ctx context.Context, sandboxID string) (string, error)
 	// GetPodIPs returns the network status (interfaces, IPs, and routes) for the sandbox.
-	GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodNetworkStatus, error)
+	GetPodIPs(ctx context.Context, sandboxID string) (*networking.PodNetworkStatus, error)
 	// GetPodNetwork returns the full network state of the sandbox.
-	GetPodNetwork(ctx context.Context, sandboxID string) (*pod.PodNetworkState, error)
+	GetPodNetwork(ctx context.Context, sandboxID string) (*networking.PodNetworkState, error)
 	// MoveDevice moves a network device into the sandbox's network namespace.
-	MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType pod.DeviceType, targetName string) (*pod.MoveDeviceResult, error)
+	MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType networking.DeviceType, targetName string) (*networking.MoveDeviceResult, error)
 	// AssignIPAddress assigns an IP address to an interface in the sandbox's network namespace.
 	AssignIPAddress(ctx context.Context, sandboxID string, interfaceName string, address string) error
 	// ApplyRoute adds a route in the sandbox's network namespace.
-	ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error
+	ApplyRoute(ctx context.Context, sandboxID string, route networking.Route) error
 	// ApplyRule adds an ip rule in the sandbox's network namespace.
-	ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error
+	ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule) error
 	// CreateNetdev creates a new network device inside the sandbox's network namespace.
-	CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error)
+	CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error)
 }
 
 // GetPodResources returns the network namespace path for the sandbox identified by sandboxID.
@@ -62,7 +62,7 @@ func (c *criService) GetPodResources(ctx context.Context, sandboxID string) (str
 // identified by sandboxID. When a CNI result is available it is used directly.
 // Otherwise, the function falls back to inspecting the pod network namespace
 // via netlink.
-func (c *criService) GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodNetworkStatus, error) {
+func (c *criService) GetPodIPs(ctx context.Context, sandboxID string) (*networking.PodNetworkStatus, error) {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
@@ -75,7 +75,7 @@ func (c *criService) GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodN
 	// Host-network pods have no dedicated netns and no CNI result —
 	// return an empty status rather than an error.
 	if sb.NetNSPath == "" {
-		return &pod.PodNetworkStatus{}, nil
+		return &networking.PodNetworkStatus{}, nil
 	}
 
 	// Fallback: inspect the pod network namespace directly via netlink.
@@ -83,7 +83,7 @@ func (c *criService) GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodN
 }
 
 // podNetworkStatusFromCNI builds a PodNetworkStatus from a stored CNI result.
-func podNetworkStatusFromCNI(sb sandboxstore.Sandbox) *pod.PodNetworkStatus {
+func podNetworkStatusFromCNI(sb sandboxstore.Sandbox) *networking.PodNetworkStatus {
 	ifaces := make(map[string][]string, len(sb.CNIResult.Interfaces))
 	for name, cfg := range sb.CNIResult.Interfaces {
 		ips := make([]string, 0, len(cfg.IPConfigs))
@@ -93,9 +93,9 @@ func podNetworkStatusFromCNI(sb sandboxstore.Sandbox) *pod.PodNetworkStatus {
 		ifaces[name] = ips
 	}
 
-	routes := make([]pod.Route, 0, len(sb.CNIResult.Routes))
+	routes := make([]networking.Route, 0, len(sb.CNIResult.Routes))
 	for _, r := range sb.CNIResult.Routes {
-		rt := pod.Route{
+		rt := networking.Route{
 			Destination: r.Dst.String(),
 		}
 		if r.GW != nil {
@@ -104,7 +104,7 @@ func podNetworkStatusFromCNI(sb sandboxstore.Sandbox) *pod.PodNetworkStatus {
 		routes = append(routes, rt)
 	}
 
-	return &pod.PodNetworkStatus{
+	return &networking.PodNetworkStatus{
 		InterfaceIPs: ifaces,
 		Routes:       routes,
 	}
@@ -113,12 +113,12 @@ func podNetworkStatusFromCNI(sb sandboxstore.Sandbox) *pod.PodNetworkStatus {
 // podNetworkStatusFromNetNS enters the given network namespace and discovers
 // interfaces, IP addresses, and routes using netlink. This is the fallback
 // path used when CNI results are not available (e.g. CNI is disabled).
-func podNetworkStatusFromNetNS(netnsPath string) (*pod.PodNetworkStatus, error) {
+func podNetworkStatusFromNetNS(netnsPath string) (*networking.PodNetworkStatus, error) {
 	if netnsPath == "" {
 		return nil, fmt.Errorf("network namespace path is empty")
 	}
 
-	var status pod.PodNetworkStatus
+	var status networking.PodNetworkStatus
 
 	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
 		// Build an index→name map so we can resolve link indexes in routes.
@@ -162,7 +162,7 @@ func podNetworkStatusFromNetNS(netnsPath string) (*pod.PodNetworkStatus, error) 
 			return fmt.Errorf("failed to list routes: %w", err)
 		}
 		for _, r := range routes {
-			rt := pod.Route{
+			rt := networking.Route{
 				InterfaceName: indexToName[r.LinkIndex],
 			}
 			if r.Dst != nil {

@@ -14,32 +14,32 @@
    limitations under the License.
 */
 
-// Package proxy provides a gRPC-backed implementation of the pod.PodResourcesClient
+// Package proxy provides a gRPC-backed implementation of the networking.PodResourcesClient
 // interface. External consumers such as the kubelet or DRA drivers can use
 // NewPodResourcesClient to obtain a client that communicates with the
-// containerd Pod gRPC service.
+// containerd PodNetwork gRPC service.
 package proxy
 
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/pod/v1"
+	api "github.com/containerd/containerd/api/services/networking/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"google.golang.org/grpc"
 
-	"github.com/containerd/containerd/v2/core/pod"
+	"github.com/containerd/containerd/v2/core/networking"
 )
 
-// remotePodResourcesClient is a gRPC-backed implementation of pod.PodResourcesClient.
+// remotePodResourcesClient is a gRPC-backed implementation of networking.PodResourcesClient.
 type remotePodResourcesClient struct {
-	client api.PodClient
+	client api.PodNetworkClient
 }
 
 // NewPodResourcesClient creates a new PodResourcesClient backed by the given
 // gRPC connection. This is the primary entry point for external consumers.
-func NewPodResourcesClient(conn grpc.ClientConnInterface) pod.PodResourcesClient {
+func NewPodResourcesClient(conn grpc.ClientConnInterface) networking.PodResourcesClient {
 	return &remotePodResourcesClient{
-		client: api.NewPodClient(conn),
+		client: api.NewPodNetworkClient(conn),
 	}
 }
 
@@ -55,7 +55,7 @@ func (r *remotePodResourcesClient) GetPodResources(ctx context.Context, sandboxI
 }
 
 // GetPodIPs returns the network status (interfaces, IPs, and routes) for the given sandbox.
-func (r *remotePodResourcesClient) GetPodIPs(ctx context.Context, sandboxID string) (*pod.PodNetworkStatus, error) {
+func (r *remotePodResourcesClient) GetPodIPs(ctx context.Context, sandboxID string) (*networking.PodNetworkStatus, error) {
 	resp, err := r.client.GetPodIPs(ctx, &api.GetPodIPsRequest{
 		SandboxId: sandboxID,
 	})
@@ -66,22 +66,22 @@ func (r *remotePodResourcesClient) GetPodIPs(ctx context.Context, sandboxID stri
 	for name, iface := range resp.InterfaceIps {
 		ifaces[name] = iface.Ips
 	}
-	routes := make([]pod.Route, len(resp.Routes))
+	routes := make([]networking.Route, len(resp.Routes))
 	for i, r := range resp.Routes {
-		routes[i] = pod.Route{
+		routes[i] = networking.Route{
 			Destination:   r.Destination,
 			Gateway:       r.Gateway,
 			InterfaceName: r.InterfaceName,
 		}
 	}
-	return &pod.PodNetworkStatus{
+	return &networking.PodNetworkStatus{
 		InterfaceIPs: ifaces,
 		Routes:       routes,
 	}, nil
 }
 
 // GetPodNetwork returns the full network state of the given sandbox.
-func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID string) (*pod.PodNetworkState, error) {
+func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID string) (*networking.PodNetworkState, error) {
 	resp, err := r.client.GetPodNetwork(ctx, &api.GetPodNetworkRequest{
 		SandboxId: sandboxID,
 	})
@@ -89,14 +89,14 @@ func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID 
 		return nil, errgrpc.ToNative(err)
 	}
 
-	state := &pod.PodNetworkState{}
+	state := &networking.PodNetworkState{}
 
 	for _, iface := range resp.Interfaces {
-		devType := pod.NetDev
+		devType := networking.NetDev
 		if iface.Type == api.DeviceType_RDMA {
-			devType = pod.RDMA
+			devType = networking.RDMA
 		}
-		state.Interfaces = append(state.Interfaces, pod.NetworkInterface{
+		state.Interfaces = append(state.Interfaces, networking.NetworkInterface{
 			Name:       iface.Name,
 			MACAddress: iface.MacAddress,
 			Type:       devType,
@@ -107,7 +107,7 @@ func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID 
 	}
 
 	for _, rt := range resp.Routes {
-		state.Routes = append(state.Routes, pod.Route{
+		state.Routes = append(state.Routes, networking.Route{
 			Destination:   rt.Destination,
 			Gateway:       rt.Gateway,
 			InterfaceName: rt.InterfaceName,
@@ -117,7 +117,7 @@ func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID 
 	}
 
 	for _, rl := range resp.Rules {
-		state.Rules = append(state.Rules, pod.RoutingRule{
+		state.Rules = append(state.Rules, networking.RoutingRule{
 			Priority: rl.Priority,
 			Src:      rl.Src,
 			Dst:      rl.Dst,
@@ -131,9 +131,9 @@ func (r *remotePodResourcesClient) GetPodNetwork(ctx context.Context, sandboxID 
 }
 
 // MoveDevice moves a network device into the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType pod.DeviceType, targetName string) (*pod.MoveDeviceResult, error) {
+func (r *remotePodResourcesClient) MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType networking.DeviceType, targetName string) (*networking.MoveDeviceResult, error) {
 	apiType := api.DeviceType_NETDEV
-	if deviceType == pod.RDMA {
+	if deviceType == networking.RDMA {
 		apiType = api.DeviceType_RDMA
 	}
 
@@ -147,13 +147,13 @@ func (r *remotePodResourcesClient) MoveDevice(ctx context.Context, sandboxID str
 		return nil, errgrpc.ToNative(err)
 	}
 
-	result := &pod.MoveDeviceResult{
+	result := &networking.MoveDeviceResult{
 		DeviceName: resp.DeviceName,
 		Addresses:  resp.Addresses,
 	}
 
 	for _, rt := range resp.Routes {
-		result.Routes = append(result.Routes, pod.Route{
+		result.Routes = append(result.Routes, networking.Route{
 			Destination:   rt.Destination,
 			Gateway:       rt.Gateway,
 			InterfaceName: rt.InterfaceName,
@@ -163,7 +163,7 @@ func (r *remotePodResourcesClient) MoveDevice(ctx context.Context, sandboxID str
 	}
 
 	for _, rl := range resp.Rules {
-		result.Rules = append(result.Rules, pod.RoutingRule{
+		result.Rules = append(result.Rules, networking.RoutingRule{
 			Priority: rl.Priority,
 			Src:      rl.Src,
 			Dst:      rl.Dst,
@@ -190,7 +190,7 @@ func (r *remotePodResourcesClient) AssignIPAddress(ctx context.Context, sandboxI
 }
 
 // ApplyRoute adds a route inside the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error {
+func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route) error {
 	_, err := r.client.ApplyRoute(ctx, &api.ApplyRouteRequest{
 		SandboxId: sandboxID,
 		Route: &api.RouteEntry{
@@ -208,7 +208,7 @@ func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID str
 }
 
 // ApplyRule adds an ip rule inside the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error {
+func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule) error {
 	_, err := r.client.ApplyRule(ctx, &api.ApplyRuleRequest{
 		SandboxId: sandboxID,
 		Rule: &api.RoutingRule{
@@ -227,7 +227,7 @@ func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID stri
 }
 
 // CreateNetdev creates a new network device inside the pod sandbox's network namespace.
-func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	apiReq := &api.CreateNetdevRequest{
 		SandboxId: req.SandboxID,
 		Name:      req.Name,
@@ -282,7 +282,7 @@ func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req pod.Cre
 		return nil, errgrpc.ToNative(err)
 	}
 
-	result := &pod.CreateNetdevResult{}
+	result := &networking.CreateNetdevResult{}
 	if resp.Interface != nil {
 		result.Interface = apiToNetworkInterface(resp.Interface)
 	}
@@ -295,12 +295,12 @@ func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req pod.Cre
 }
 
 // apiToNetworkInterface converts an API NetworkInterface to a domain type.
-func apiToNetworkInterface(iface *api.NetworkInterface) pod.NetworkInterface {
-	devType := pod.NetDev
+func apiToNetworkInterface(iface *api.NetworkInterface) networking.NetworkInterface {
+	devType := networking.NetDev
 	if iface.Type == api.DeviceType_RDMA {
-		devType = pod.RDMA
+		devType = networking.RDMA
 	}
-	return pod.NetworkInterface{
+	return networking.NetworkInterface{
 		Name:       iface.Name,
 		MACAddress: iface.MacAddress,
 		Type:       devType,

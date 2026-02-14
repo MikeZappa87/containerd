@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package pod
+package networking
 
 import (
 	"context"
@@ -25,18 +25,18 @@ import (
 
 	"google.golang.org/grpc"
 
-	api "github.com/containerd/containerd/api/services/pod/v1"
+	api "github.com/containerd/containerd/api/services/networking/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
-	corepod "github.com/containerd/containerd/v2/core/pod"
+	corenetworking "github.com/containerd/containerd/v2/core/networking"
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
-// Config holds the configuration for the Pod gRPC service plugin.
+// Config holds the configuration for the PodNetwork gRPC service plugin.
 type Config struct {
 	// Address is the unix socket address for a dedicated Pod API listener.
 	// When empty (default), the Pod service is registered on the main
@@ -53,12 +53,12 @@ type Config struct {
 
 func init() {
 	defaultConfig := Config{
-		Address: "/run/k8s/pod.sock",
+		Address: "/run/k8s/network.sock",
 	}
 
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
-		ID:   "pod",
+		ID:   "networking",
 		Requires: []plugin.Type{
 			plugins.GRPCPlugin,
 		},
@@ -89,7 +89,7 @@ func init() {
 				if err := svc.startDedicatedServer(ic.Context, config); err != nil {
 					return nil, fmt.Errorf("failed to start dedicated pod gRPC server: %w", err)
 				}
-				log.G(ic.Context).WithField("address", config.Address).Info("pod gRPC service listening on dedicated socket")
+				log.G(ic.Context).WithField("address", config.Address).Info("networking gRPC service listening on dedicated socket")
 			}
 
 			return svc, nil
@@ -99,14 +99,14 @@ func init() {
 
 type podService struct {
 	provider server.PodResourcesProvider
-	api.UnimplementedPodServer
+	api.UnimplementedPodNetworkServer
 
 	// dedicated is non-nil when the plugin runs its own gRPC server.
 	dedicated *grpc.Server
 	listener  net.Listener
 }
 
-var _ api.PodServer = (*podService)(nil)
+var _ api.PodNetworkServer = (*podService)(nil)
 
 // Register registers the Pod gRPC service with the shared containerd
 // gRPC server. It is a no-op when a dedicated address is configured
@@ -116,7 +116,7 @@ func (s *podService) Register(srv *grpc.Server) error {
 		// Already running on a dedicated socket; skip shared registration.
 		return nil
 	}
-	api.RegisterPodServer(srv, s)
+	api.RegisterPodNetworkServer(srv, s)
 	return nil
 }
 
@@ -163,14 +163,14 @@ func (s *podService) startDedicatedServer(ctx context.Context, config *Config) e
 	}
 
 	srv := grpc.NewServer()
-	api.RegisterPodServer(srv, s)
+	api.RegisterPodNetworkServer(srv, s)
 
 	s.dedicated = srv
 	s.listener = l
 
 	go func() {
 		if err := srv.Serve(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", addr).Error("pod dedicated gRPC server exited")
+			log.G(ctx).WithError(err).WithField("address", addr).Error("networking dedicated gRPC server exited")
 		}
 	}()
 
@@ -243,7 +243,7 @@ func (s *podService) GetPodNetwork(ctx context.Context, req *api.GetPodNetworkRe
 
 	for _, iface := range state.Interfaces {
 		devType := api.DeviceType_NETDEV
-		if iface.Type == corepod.RDMA {
+		if iface.Type == corenetworking.RDMA {
 			devType = api.DeviceType_RDMA
 		}
 		resp.Interfaces = append(resp.Interfaces, &api.NetworkInterface{
@@ -284,12 +284,12 @@ func (s *podService) GetPodNetwork(ctx context.Context, req *api.GetPodNetworkRe
 func (s *podService) MoveDevice(ctx context.Context, req *api.MoveDeviceRequest) (*api.MoveDeviceResponse, error) {
 	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("device", req.DeviceName).Debug("move device")
 
-	var devType corepod.DeviceType
+	var devType corenetworking.DeviceType
 	switch req.DeviceType {
 	case api.DeviceType_RDMA:
-		devType = corepod.RDMA
+		devType = corenetworking.RDMA
 	default:
-		devType = corepod.NetDev
+		devType = corenetworking.NetDev
 	}
 
 	result, err := s.provider.MoveDevice(ctx, req.SandboxId, req.DeviceName, devType, req.TargetName)
@@ -345,7 +345,7 @@ func (s *podService) ApplyRoute(ctx context.Context, req *api.ApplyRouteRequest)
 		return nil, fmt.Errorf("route is required")
 	}
 
-	rt := corepod.Route{
+	rt := corenetworking.Route{
 		Destination:   req.Route.Destination,
 		Gateway:       req.Route.Gateway,
 		InterfaceName: req.Route.InterfaceName,
@@ -368,7 +368,7 @@ func (s *podService) ApplyRule(ctx context.Context, req *api.ApplyRuleRequest) (
 		return nil, fmt.Errorf("rule is required")
 	}
 
-	rl := corepod.RoutingRule{
+	rl := corenetworking.RoutingRule{
 		Priority: req.Rule.Priority,
 		Src:      req.Rule.Src,
 		Dst:      req.Rule.Dst,
@@ -388,7 +388,7 @@ func (s *podService) ApplyRule(ctx context.Context, req *api.ApplyRuleRequest) (
 func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequest) (*api.CreateNetdevResponse, error) {
 	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("name", req.Name).Debug("create netdev")
 
-	domReq := corepod.CreateNetdevRequest{
+	domReq := corenetworking.CreateNetdevRequest{
 		SandboxID: req.SandboxId,
 		Name:      req.Name,
 		MTU:       req.Mtu,
@@ -397,12 +397,12 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 
 	switch cfg := req.Config.(type) {
 	case *api.CreateNetdevRequest_Veth:
-		domReq.Veth = &corepod.VethConfig{
+		domReq.Veth = &corenetworking.VethConfig{
 			PeerName:      cfg.Veth.PeerName,
 			PeerNetNSPath: cfg.Veth.PeerNetnsPath,
 		}
 	case *api.CreateNetdevRequest_Vxlan:
-		domReq.Vxlan = &corepod.VxlanConfig{
+		domReq.Vxlan = &corenetworking.VxlanConfig{
 			VNI:            cfg.Vxlan.Vni,
 			Group:          cfg.Vxlan.Group,
 			Port:           cfg.Vxlan.Port,
@@ -412,17 +412,17 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 			Learning:       cfg.Vxlan.Learning,
 		}
 	case *api.CreateNetdevRequest_Dummy:
-		domReq.Dummy = &corepod.DummyConfig{}
+		domReq.Dummy = &corenetworking.DummyConfig{}
 	case *api.CreateNetdevRequest_Ipvlan:
-		domReq.IPVlan = &corepod.IPVlanConfig{
+		domReq.IPVlan = &corenetworking.IPVlanConfig{
 			Parent: cfg.Ipvlan.Parent,
-			Mode:   corepod.IPVlanMode(cfg.Ipvlan.Mode),
-			Flag:   corepod.IPVlanFlag(cfg.Ipvlan.Flag),
+			Mode:   corenetworking.IPVlanMode(cfg.Ipvlan.Mode),
+			Flag:   corenetworking.IPVlanFlag(cfg.Ipvlan.Flag),
 		}
 	case *api.CreateNetdevRequest_Macvlan:
-		domReq.Macvlan = &corepod.MacvlanConfig{
+		domReq.Macvlan = &corenetworking.MacvlanConfig{
 			Parent:     cfg.Macvlan.Parent,
-			Mode:       corepod.MacvlanMode(cfg.Macvlan.Mode),
+			Mode:       corenetworking.MacvlanMode(cfg.Macvlan.Mode),
 			MACAddress: cfg.Macvlan.MacAddress,
 		}
 	default:
@@ -445,9 +445,9 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 }
 
 // networkInterfaceToAPI converts a domain NetworkInterface to the API type.
-func networkInterfaceToAPI(iface corepod.NetworkInterface) *api.NetworkInterface {
+func networkInterfaceToAPI(iface corenetworking.NetworkInterface) *api.NetworkInterface {
 	devType := api.DeviceType_NETDEV
-	if iface.Type == corepod.RDMA {
+	if iface.Type == corenetworking.RDMA {
 		devType = api.DeviceType_RDMA
 	}
 	return &api.NetworkInterface{

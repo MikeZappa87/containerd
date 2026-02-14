@@ -16,12 +16,12 @@
 
 syntax = "proto3";
 
-package containerd.services.pod.v1;
+package containerd.services.networking.v1;
 
-option go_package = "github.com/containerd/containerd/api/services/pod/v1;pod";
+option go_package = "github.com/containerd/containerd/api/services/networking/v1;networking";
 
-// Pod provides an API for managing pod-level network resources.
-service Pod {
+// PodNetwork provides an API for managing pod-level network resources.
+service PodNetwork {
 	// GetPodResources returns resources associated with a pod sandbox.
 	rpc GetPodResources(GetPodResourcesRequest) returns (GetPodResourcesResponse);
 
@@ -44,6 +44,9 @@ service Pod {
 
 	// ApplyRoute adds a route in the pod sandbox's network namespace.
 	rpc ApplyRoute(ApplyRouteRequest) returns (ApplyRouteResponse);
+
+	// ApplyRule adds an ip rule in the pod sandbox's network namespace.
+	rpc ApplyRule(ApplyRuleRequest) returns (ApplyRuleResponse);
 
 	// CreateNetdev creates a new Linux network device inside the pod
 	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
@@ -230,6 +233,19 @@ message ApplyRouteRequest {
 }
 
 message ApplyRouteResponse {}
+
+// ———————————————————————————————————————————————
+// ApplyRule
+// ———————————————————————————————————————————————
+
+message ApplyRuleRequest {
+	string sandbox_id = 1;
+
+	// Rule to apply inside the pod netns.
+	RoutingRule rule = 2;
+}
+
+message ApplyRuleResponse {}
 
 // ———————————————————————————————————————————————
 // CreateNetdev

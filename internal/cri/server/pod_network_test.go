@@ -30,7 +30,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
-	"github.com/containerd/containerd/v2/core/pod"
+	"github.com/containerd/containerd/v2/core/networking"
 )
 
 // requireRoot skips the test if not running as root (needed for netns/netlink).
@@ -462,11 +462,11 @@ func TestCreateNetdev_Dummy(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	req := pod.CreateNetdevRequest{
+	req := networking.CreateNetdevRequest{
 		Name:      "dummy0",
 		MTU:       1400,
 		Addresses: []string{"10.50.0.1/24"},
-		Dummy:     &pod.DummyConfig{},
+		Dummy:     &networking.DummyConfig{},
 	}
 
 	result, err := createNetdev(nsPath, req)
@@ -521,11 +521,11 @@ func TestCreateNetdev_Veth(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	req := pod.CreateNetdevRequest{
+	req := networking.CreateNetdevRequest{
 		Name:      "eth0",
 		MTU:       1500,
 		Addresses: []string{"10.60.0.2/24"},
-		Veth: &pod.VethConfig{
+		Veth: &networking.VethConfig{
 			PeerName: "veth-host0",
 		},
 	}
@@ -586,9 +586,9 @@ func TestCreateNetdev_Vxlan(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	req := pod.CreateNetdevRequest{
+	req := networking.CreateNetdevRequest{
 		Name: "vxlan100",
-		Vxlan: &pod.VxlanConfig{
+		Vxlan: &networking.VxlanConfig{
 			VNI:  100,
 			Port: 4789,
 		},
@@ -623,7 +623,7 @@ func TestCreateNetdev_NoConfig(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{Name: "bad0"})
+	_, err := createNetdev(nsPath, networking.CreateNetdevRequest{Name: "bad0"})
 	if err == nil {
 		t.Fatal("expected error when no config is specified")
 	}
@@ -639,8 +639,8 @@ func TestCreateNetdev_DummyNoName(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{
-		Dummy: &pod.DummyConfig{},
+	_, err := createNetdev(nsPath, networking.CreateNetdevRequest{
+		Dummy: &networking.DummyConfig{},
 	})
 	if err == nil {
 		t.Fatal("expected error when name is empty")
@@ -657,9 +657,9 @@ func TestCreateNetdev_VethPeerRequired(t *testing.T) {
 	nsPath, cleanup := newTestNetNS(t)
 	defer cleanup()
 
-	_, err := createNetdev(nsPath, pod.CreateNetdevRequest{
+	_, err := createNetdev(nsPath, networking.CreateNetdevRequest{
 		Name: "eth0",
-		Veth: &pod.VethConfig{},
+		Veth: &networking.VethConfig{},
 	})
 	if err == nil {
 		t.Fatal("expected error when veth peer_name is empty")

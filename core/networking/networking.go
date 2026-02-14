@@ -14,8 +14,8 @@
    limitations under the License.
 */
 
-// Package pod defines the interface for querying and managing pod-level network resources.
-package pod
+// Package networking defines the interface for querying and managing pod-level network resources.
+package networking
 
 import "context"
 

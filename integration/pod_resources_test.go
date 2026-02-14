@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	podapi "github.com/containerd/containerd/api/services/pod/v1"
+	podapi "github.com/containerd/containerd/api/services/networking/v1"
 	dialer "github.com/containerd/containerd/v2/integration/remote/util"
 )
 
@@ -40,7 +40,7 @@ var podEndpoint = flag.String("pod-endpoint", "", "Optional dedicated Pod gRPC e
 
 // newPodClient creates a Pod gRPC client connected to either the dedicated
 // pod endpoint (if configured) or the main containerd endpoint.
-func newPodClient(t *testing.T) podapi.PodClient {
+func newPodNetworkClient(t *testing.T) podapi.PodNetworkClient {
 	t.Helper()
 
 	endpoint := *criEndpoint
@@ -58,7 +58,7 @@ func newPodClient(t *testing.T) podapi.PodClient {
 	require.NoError(t, err, "dial Pod gRPC endpoint %s", endpoint)
 	t.Cleanup(func() { conn.Close() })
 
-	return podapi.NewPodClient(conn)
+	return podapi.NewPodNetworkClient(conn)
 }
 
 // TestPodResources_GetPodResources verifies that after RunPodSandbox the
@@ -74,7 +74,7 @@ func TestPodResources_GetPodResources(t *testing.T) {
 	require.NotEmpty(t, info.Metadata.NetNSPath, "sandbox should have a network namespace path")
 
 	t.Log("Call GetPodResources via the Pod gRPC API")
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 	resp, err := podClient.GetPodResources(context.Background(), &podapi.GetPodResourcesRequest{
 		SandboxId: sb,
 	})
@@ -105,7 +105,7 @@ func TestPodResources_GetPodIPs(t *testing.T) {
 	require.NotEmpty(t, criIP, "sandbox should have an IP assigned by CNI")
 
 	t.Log("Call GetPodIPs via the Pod gRPC API")
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 	resp, err := podClient.GetPodIPs(context.Background(), &podapi.GetPodIPsRequest{
 		SandboxId: sb,
 	})
@@ -142,7 +142,7 @@ func TestPodResources_GetPodIPs_Routes(t *testing.T) {
 	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "pod-routes")
 
 	t.Log("Call GetPodIPs via the Pod gRPC API")
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 	resp, err := podClient.GetPodIPs(context.Background(), &podapi.GetPodIPsRequest{
 		SandboxId: sb,
 	})
@@ -180,7 +180,7 @@ func TestPodResources_GetPodIPs_CNIResult(t *testing.T) {
 	require.NotNil(t, info.CNIResult, "sandbox verbose info should contain a CNI result")
 
 	t.Log("Call GetPodIPs via the Pod gRPC API")
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 	resp, err := podClient.GetPodIPs(context.Background(), &podapi.GetPodIPsRequest{
 		SandboxId: sb,
 	})
@@ -222,7 +222,7 @@ func TestPodResources_HostNetwork(t *testing.T) {
 	t.Log("Create a host-network pod sandbox")
 	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "host-network", WithHostNetwork)
 
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 
 	t.Log("Call GetPodResources — should return empty netns path for host-network")
 	resResp, err := podClient.GetPodResources(context.Background(), &podapi.GetPodResourcesRequest{
@@ -246,7 +246,7 @@ func TestPodResources_HostNetwork(t *testing.T) {
 // TestPodResources_NotFound verifies that querying a non-existent
 // sandbox returns an appropriate error.
 func TestPodResources_NotFound(t *testing.T) {
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 
 	t.Log("Call GetPodResources with a bogus sandbox ID")
 	_, err := podClient.GetPodResources(context.Background(), &podapi.GetPodResourcesRequest{
@@ -282,7 +282,7 @@ func TestPodResources_AfterStopPodSandbox(t *testing.T) {
 	require.NotEmpty(t, criIP)
 
 	t.Log("Capture GetPodResources before stop")
-	podClient := newPodClient(t)
+	podClient := newPodNetworkClient(t)
 	resBefore, err := podClient.GetPodResources(context.Background(), &podapi.GetPodResourcesRequest{
 		SandboxId: sb,
 	})

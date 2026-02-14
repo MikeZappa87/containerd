@@ -123,7 +123,7 @@ github.com/containerd/containerd/api/services/introspection/v1
 github.com/containerd/containerd/api/services/leases/v1
 github.com/containerd/containerd/api/services/mounts/v1
 github.com/containerd/containerd/api/services/namespaces/v1
-github.com/containerd/containerd/api/services/pod/v1
+github.com/containerd/containerd/api/services/networking/v1
 github.com/containerd/containerd/api/services/sandbox/v1
 github.com/containerd/containerd/api/services/snapshots/v1
 github.com/containerd/containerd/api/services/streaming/v1

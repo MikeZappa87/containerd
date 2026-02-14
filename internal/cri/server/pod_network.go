@@ -29,18 +29,18 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
-	"github.com/containerd/containerd/v2/core/pod"
+	"github.com/containerd/containerd/v2/core/networking"
 )
 
 // GetPodNetwork returns the full network state (interfaces, routes, rules) for the sandbox.
-func (c *criService) GetPodNetwork(ctx context.Context, sandboxID string) (*pod.PodNetworkState, error) {
+func (c *criService) GetPodNetwork(ctx context.Context, sandboxID string) (*networking.PodNetworkState, error) {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
 	}
 
 	if sb.NetNSPath == "" {
-		return &pod.PodNetworkState{}, nil
+		return &networking.PodNetworkState{}, nil
 	}
 
 	return getPodNetworkState(sb.NetNSPath)
@@ -48,7 +48,7 @@ func (c *criService) GetPodNetwork(ctx context.Context, sandboxID string) (*pod.
 
 // MoveDevice moves a network device from the root netns into the pod's netns,
 // preserving any IP addresses, routes, and routing rules associated with it.
-func (c *criService) MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType pod.DeviceType, targetName string) (*pod.MoveDeviceResult, error) {
+func (c *criService) MoveDevice(ctx context.Context, sandboxID string, deviceName string, deviceType networking.DeviceType, targetName string) (*networking.MoveDeviceResult, error) {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
@@ -57,7 +57,7 @@ func (c *criService) MoveDevice(ctx context.Context, sandboxID string, deviceNam
 		return nil, fmt.Errorf("sandbox %q has no network namespace", sandboxID)
 	}
 
-	if deviceType == pod.RDMA {
+	if deviceType == networking.RDMA {
 		return moveRDMADevice(sb.NetNSPath, deviceName, targetName)
 	}
 	return moveNetDevice(sb.NetNSPath, deviceName, targetName)
@@ -91,7 +91,7 @@ func (c *criService) AssignIPAddress(ctx context.Context, sandboxID string, inte
 }
 
 // ApplyRoute adds a route inside the pod's network namespace.
-func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error {
+func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route networking.Route) error {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
@@ -148,7 +148,7 @@ func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route pod
 }
 
 // ApplyRule adds an ip rule inside the pod's network namespace.
-func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error {
+func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule) error {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
@@ -197,8 +197,8 @@ func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule pod.R
 }
 
 // getPodNetworkState enters the pod netns and collects full network state.
-func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
-	var state pod.PodNetworkState
+func getPodNetworkState(netnsPath string) (*networking.PodNetworkState, error) {
+	var state networking.PodNetworkState
 
 	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
 		links, err := netlink.LinkList()
@@ -225,10 +225,10 @@ func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
 				continue
 			}
 
-			iface := pod.NetworkInterface{
+			iface := networking.NetworkInterface{
 				Name:       attrs.Name,
 				MACAddress: attrs.HardwareAddr.String(),
-				Type:       pod.NetDev,
+				Type:       networking.NetDev,
 				MTU:        uint32(attrs.MTU),
 			}
 
@@ -255,7 +255,7 @@ func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
 			return fmt.Errorf("failed to list routes: %w", err)
 		}
 		for _, r := range routes {
-			rt := pod.Route{
+			rt := networking.Route{
 				InterfaceName: indexToName[r.LinkIndex],
 				Metric:        uint32(r.Priority),
 			}
@@ -284,7 +284,7 @@ func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
 			return fmt.Errorf("failed to list rules: %w", err)
 		}
 		for _, r := range rules {
-			rule := pod.RoutingRule{
+			rule := networking.RoutingRule{
 				Priority: uint32(r.Priority),
 				Table:    strconv.Itoa(r.Table),
 				IIF:      r.IifName,
@@ -310,12 +310,12 @@ func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
 
 // moveNetDevice moves a Linux net device from the root netns into the target netns,
 // preserving its addresses, routes and routing rules.
-func moveNetDevice(netnsPath string, deviceName string, targetName string) (*pod.MoveDeviceResult, error) {
+func moveNetDevice(netnsPath string, deviceName string, targetName string) (*networking.MoveDeviceResult, error) {
 	if targetName == "" {
 		targetName = deviceName
 	}
 
-	result := &pod.MoveDeviceResult{DeviceName: targetName}
+	result := &networking.MoveDeviceResult{DeviceName: targetName}
 
 	// Open the target netns fd.
 	targetNS, err := netns.GetFromPath(netnsPath)
@@ -347,7 +347,7 @@ func moveNetDevice(netnsPath string, deviceName string, targetName string) (*pod
 		if r.LinkIndex != linkIndex {
 			continue
 		}
-		rt := pod.Route{
+		rt := networking.Route{
 			InterfaceName: targetName,
 			Metric:        uint32(r.Priority),
 		}
@@ -378,7 +378,7 @@ func moveNetDevice(netnsPath string, deviceName string, targetName string) (*pod
 		if r.IifName != deviceName && r.OifName != deviceName {
 			continue
 		}
-		rule := pod.RoutingRule{
+		rule := networking.RoutingRule{
 			Priority: uint32(r.Priority),
 			Table:    strconv.Itoa(r.Table),
 		}
@@ -494,7 +494,7 @@ func moveNetDevice(netnsPath string, deviceName string, targetName string) (*pod
 //     underlying net device; the RDMA device is already accessible.
 //   - exclusive: RDMA devices are bound to their netns. Moving the
 //     underlying net device causes the RDMA device to follow.
-func moveRDMADevice(netnsPath string, deviceName string, targetName string) (*pod.MoveDeviceResult, error) {
+func moveRDMADevice(netnsPath string, deviceName string, targetName string) (*networking.MoveDeviceResult, error) {
 	if targetName == "" {
 		targetName = deviceName
 	}
@@ -554,7 +554,7 @@ func rdmaToNetDev(rdmaDevice string) (string, error) {
 }
 
 // CreateNetdev creates a new Linux network device inside the pod's network namespace.
-func (c *criService) CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func (c *criService) CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	sb, err := c.sandboxStore.Get(req.SandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", req.SandboxID, err)
@@ -567,7 +567,7 @@ func (c *criService) CreateNetdev(ctx context.Context, req pod.CreateNetdevReque
 }
 
 // createNetdev performs the actual netlink device creation inside the given netns.
-func createNetdev(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func createNetdev(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	if req.Name == "" {
 		return nil, fmt.Errorf("device name is required")
 	}
@@ -589,13 +589,13 @@ func createNetdev(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNet
 }
 
 // createVethDevice creates a veth pair with one end in the pod netns.
-func createVethDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func createVethDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	cfg := req.Veth
 	if cfg.PeerName == "" {
 		return nil, fmt.Errorf("veth peer_name is required")
 	}
 
-	result := &pod.CreateNetdevResult{}
+	result := &networking.CreateNetdevResult{}
 
 	// Open the target netns fd.
 	targetNS, err := netns.GetFromPath(netnsPath)
@@ -701,10 +701,10 @@ func createVethDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.Creat
 }
 
 // createVxlanDevice creates a VXLAN tunnel endpoint inside the pod netns.
-func createVxlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func createVxlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	cfg := req.Vxlan
 
-	result := &pod.CreateNetdevResult{}
+	result := &networking.CreateNetdevResult{}
 
 	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
 		vxlan := &netlink.Vxlan{
@@ -784,8 +784,8 @@ func createVxlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.Crea
 }
 
 // createDummyDevice creates a dummy interface inside the pod netns.
-func createDummyDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
-	result := &pod.CreateNetdevResult{}
+func createDummyDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
+	result := &networking.CreateNetdevResult{}
 
 	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
 		dummy := &netlink.Dummy{
@@ -833,13 +833,13 @@ func createDummyDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.Crea
 }
 
 // createIPVlanDevice creates an ipvlan subordinate device inside the pod netns.
-func createIPVlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func createIPVlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	cfg := req.IPVlan
 	if cfg.Parent == "" {
 		return nil, fmt.Errorf("ipvlan parent is required")
 	}
 
-	result := &pod.CreateNetdevResult{}
+	result := &networking.CreateNetdevResult{}
 
 	// Resolve the parent link index from the root namespace.
 	parentLink, err := netlink.LinkByName(cfg.Parent)
@@ -897,13 +897,13 @@ func createIPVlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.Cre
 }
 
 // createMacvlanDevice creates a macvlan subordinate device inside the pod netns.
-func createMacvlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
+func createMacvlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	cfg := req.Macvlan
 	if cfg.Parent == "" {
 		return nil, fmt.Errorf("macvlan parent is required")
 	}
 
-	result := &pod.CreateNetdevResult{}
+	result := &networking.CreateNetdevResult{}
 
 	// Resolve the parent link index from the root namespace.
 	parentLink, err := netlink.LinkByName(cfg.Parent)
@@ -967,15 +967,15 @@ func createMacvlanDevice(netnsPath string, req pod.CreateNetdevRequest) (*pod.Cr
 	return result, nil
 }
 
-// linkToNetworkInterface converts a netlink.Link to a pod.NetworkInterface.
+// linkToNetworkInterface converts a netlink.Link to a networking.NetworkInterface.
 // The link should be re-fetched after any state changes (e.g. LinkSetUp) to
 // ensure the returned state is current.
-func linkToNetworkInterface(link netlink.Link) pod.NetworkInterface {
+func linkToNetworkInterface(link netlink.Link) networking.NetworkInterface {
 	attrs := link.Attrs()
-	iface := pod.NetworkInterface{
+	iface := networking.NetworkInterface{
 		Name:       attrs.Name,
 		MACAddress: attrs.HardwareAddr.String(),
-		Type:       pod.NetDev,
+		Type:       networking.NetDev,
 		MTU:        uint32(attrs.MTU),
 	}
 
@@ -996,28 +996,28 @@ func linkToNetworkInterface(link netlink.Link) pod.NetworkInterface {
 }
 
 // bringUpAndSnapshot brings a link up, re-reads it, and returns a snapshot.
-func bringUpAndSnapshot(name string) (pod.NetworkInterface, error) {
+func bringUpAndSnapshot(name string) (networking.NetworkInterface, error) {
 	link, err := netlink.LinkByName(name)
 	if err != nil {
-		return pod.NetworkInterface{}, fmt.Errorf("link %s not found: %w", name, err)
+		return networking.NetworkInterface{}, fmt.Errorf("link %s not found: %w", name, err)
 	}
 	if err := netlink.LinkSetUp(link); err != nil {
-		return pod.NetworkInterface{}, fmt.Errorf("failed to bring up %s: %w", name, err)
+		return networking.NetworkInterface{}, fmt.Errorf("failed to bring up %s: %w", name, err)
 	}
 	// Re-read link to capture updated flags.
 	link, err = netlink.LinkByName(name)
 	if err != nil {
-		return pod.NetworkInterface{}, fmt.Errorf("link %s not found after up: %w", name, err)
+		return networking.NetworkInterface{}, fmt.Errorf("link %s not found after up: %w", name, err)
 	}
 	return linkToNetworkInterface(link), nil
 }
 
 // toNetlinkIPVlanMode converts a domain IPVlanMode to a netlink.IPVlanMode.
-func toNetlinkIPVlanMode(mode pod.IPVlanMode) netlink.IPVlanMode {
+func toNetlinkIPVlanMode(mode networking.IPVlanMode) netlink.IPVlanMode {
 	switch mode {
-	case pod.IPVlanL3:
+	case networking.IPVlanL3:
 		return netlink.IPVLAN_MODE_L3
-	case pod.IPVlanL3S:
+	case networking.IPVlanL3S:
 		return netlink.IPVLAN_MODE_L3S
 	default:
 		return netlink.IPVLAN_MODE_L2
@@ -1025,11 +1025,11 @@ func toNetlinkIPVlanMode(mode pod.IPVlanMode) netlink.IPVlanMode {
 }
 
 // toNetlinkIPVlanFlag converts a domain IPVlanFlag to a netlink.IPVlanFlag.
-func toNetlinkIPVlanFlag(flag pod.IPVlanFlag) netlink.IPVlanFlag {
+func toNetlinkIPVlanFlag(flag networking.IPVlanFlag) netlink.IPVlanFlag {
 	switch flag {
-	case pod.IPVlanFlagPrivate:
+	case networking.IPVlanFlagPrivate:
 		return netlink.IPVLAN_FLAG_PRIVATE
-	case pod.IPVlanFlagVEPA:
+	case networking.IPVlanFlagVEPA:
 		return netlink.IPVLAN_FLAG_VEPA
 	default:
 		return netlink.IPVLAN_FLAG_BRIDGE
@@ -1037,15 +1037,15 @@ func toNetlinkIPVlanFlag(flag pod.IPVlanFlag) netlink.IPVlanFlag {
 }
 
 // toNetlinkMacvlanMode converts a domain MacvlanMode to a netlink.MacvlanMode.
-func toNetlinkMacvlanMode(mode pod.MacvlanMode) netlink.MacvlanMode {
+func toNetlinkMacvlanMode(mode networking.MacvlanMode) netlink.MacvlanMode {
 	switch mode {
-	case pod.MacvlanVEPA:
+	case networking.MacvlanVEPA:
 		return netlink.MACVLAN_MODE_VEPA
-	case pod.MacvlanPrivate:
+	case networking.MacvlanPrivate:
 		return netlink.MACVLAN_MODE_PRIVATE
-	case pod.MacvlanPassthru:
+	case networking.MacvlanPassthru:
 		return netlink.MACVLAN_MODE_PASSTHRU
-	case pod.MacvlanSource:
+	case networking.MacvlanSource:
 		return netlink.MACVLAN_MODE_SOURCE
 	default:
 		return netlink.MACVLAN_MODE_BRIDGE
