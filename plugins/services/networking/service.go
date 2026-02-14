@@ -109,13 +109,9 @@ type podService struct {
 var _ api.PodNetworkServer = (*podService)(nil)
 
 // Register registers the Pod gRPC service with the shared containerd
-// gRPC server. It is a no-op when a dedicated address is configured
-// (the service is already running on its own socket).
+// gRPC server. The service is always registered on the main socket.
+// When a dedicated address is also configured, it is available on both.
 func (s *podService) Register(srv *grpc.Server) error {
-	if s.dedicated != nil {
-		// Already running on a dedicated socket; skip shared registration.
-		return nil
-	}
 	api.RegisterPodNetworkServer(srv, s)
 	return nil
 }
