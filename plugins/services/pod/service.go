@@ -360,6 +360,30 @@ func (s *podService) ApplyRoute(ctx context.Context, req *api.ApplyRouteRequest)
 	return &api.ApplyRouteResponse{}, nil
 }
 
+// ApplyRule adds an ip rule inside the pod's network namespace.
+func (s *podService) ApplyRule(ctx context.Context, req *api.ApplyRuleRequest) (*api.ApplyRuleResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).Debug("apply rule")
+
+	if req.Rule == nil {
+		return nil, fmt.Errorf("rule is required")
+	}
+
+	rl := corepod.RoutingRule{
+		Priority: req.Rule.Priority,
+		Src:      req.Rule.Src,
+		Dst:      req.Rule.Dst,
+		Table:    req.Rule.Table,
+		IIF:      req.Rule.Iif,
+		OIF:      req.Rule.Oif,
+	}
+
+	if err := s.provider.ApplyRule(ctx, req.SandboxId, rl); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &api.ApplyRuleResponse{}, nil
+}
+
 // CreateNetdev creates a new network device inside the pod's network namespace.
 func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequest) (*api.CreateNetdevResponse, error) {
 	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("name", req.Name).Debug("create netdev")

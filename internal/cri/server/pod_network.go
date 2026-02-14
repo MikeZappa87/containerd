@@ -147,6 +147,55 @@ func (c *criService) ApplyRoute(ctx context.Context, sandboxID string, route pod
 	})
 }
 
+// ApplyRule adds an ip rule inside the pod's network namespace.
+func (c *criService) ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error {
+	sb, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
+	}
+	if sb.NetNSPath == "" {
+		return fmt.Errorf("sandbox %q has no network namespace", sandboxID)
+	}
+
+	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+		nlRule := netlink.NewRule()
+
+		nlRule.Priority = int(rule.Priority)
+
+		if rule.Src != "" {
+			_, src, err := net.ParseCIDR(rule.Src)
+			if err != nil {
+				return fmt.Errorf("invalid rule src %q: %w", rule.Src, err)
+			}
+			nlRule.Src = src
+		}
+
+		if rule.Dst != "" {
+			_, dst, err := net.ParseCIDR(rule.Dst)
+			if err != nil {
+				return fmt.Errorf("invalid rule dst %q: %w", rule.Dst, err)
+			}
+			nlRule.Dst = dst
+		}
+
+		if rule.Table != "" {
+			table, err := strconv.Atoi(rule.Table)
+			if err != nil {
+				return fmt.Errorf("invalid rule table %q: %w", rule.Table, err)
+			}
+			nlRule.Table = table
+		}
+
+		nlRule.IifName = rule.IIF
+		nlRule.OifName = rule.OIF
+
+		if err := netlink.RuleAdd(nlRule); err != nil {
+			return fmt.Errorf("failed to add rule: %w", err)
+		}
+		return nil
+	})
+}
+
 // getPodNetworkState enters the pod netns and collects full network state.
 func getPodNetworkState(netnsPath string) (*pod.PodNetworkState, error) {
 	var state pod.PodNetworkState

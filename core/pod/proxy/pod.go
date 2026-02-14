@@ -207,6 +207,25 @@ func (r *remotePodResourcesClient) ApplyRoute(ctx context.Context, sandboxID str
 	return nil
 }
 
+// ApplyRule adds an ip rule inside the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error {
+	_, err := r.client.ApplyRule(ctx, &api.ApplyRuleRequest{
+		SandboxId: sandboxID,
+		Rule: &api.RoutingRule{
+			Priority: rule.Priority,
+			Src:      rule.Src,
+			Dst:      rule.Dst,
+			Table:    rule.Table,
+			Iif:      rule.IIF,
+			Oif:      rule.OIF,
+		},
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}
+
 // CreateNetdev creates a new network device inside the pod sandbox's network namespace.
 func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error) {
 	apiReq := &api.CreateNetdevRequest{

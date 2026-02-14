@@ -43,6 +43,8 @@ type PodResourcesProvider interface {
 	AssignIPAddress(ctx context.Context, sandboxID string, interfaceName string, address string) error
 	// ApplyRoute adds a route in the sandbox's network namespace.
 	ApplyRoute(ctx context.Context, sandboxID string, route pod.Route) error
+	// ApplyRule adds an ip rule in the sandbox's network namespace.
+	ApplyRule(ctx context.Context, sandboxID string, rule pod.RoutingRule) error
 	// CreateNetdev creates a new network device inside the sandbox's network namespace.
 	CreateNetdev(ctx context.Context, req pod.CreateNetdevRequest) (*pod.CreateNetdevResult, error)
 }

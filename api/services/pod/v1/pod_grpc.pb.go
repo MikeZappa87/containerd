@@ -39,6 +39,8 @@ type PodClient interface {
 	AssignIPAddress(ctx context.Context, in *AssignIPAddressRequest, opts ...grpc.CallOption) (*AssignIPAddressResponse, error)
 	// ApplyRoute adds a route in the pod sandbox's network namespace.
 	ApplyRoute(ctx context.Context, in *ApplyRouteRequest, opts ...grpc.CallOption) (*ApplyRouteResponse, error)
+	// ApplyRule adds an ip rule in the pod sandbox's network namespace.
+	ApplyRule(ctx context.Context, in *ApplyRuleRequest, opts ...grpc.CallOption) (*ApplyRuleResponse, error)
 	// CreateNetdev creates a new Linux network device inside the pod
 	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
 	// and macvlan device types.
@@ -107,6 +109,15 @@ func (c *podClient) ApplyRoute(ctx context.Context, in *ApplyRouteRequest, opts 
 	return out, nil
 }
 
+func (c *podClient) ApplyRule(ctx context.Context, in *ApplyRuleRequest, opts ...grpc.CallOption) (*ApplyRuleResponse, error) {
+	out := new(ApplyRuleResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/ApplyRule", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *podClient) CreateNetdev(ctx context.Context, in *CreateNetdevRequest, opts ...grpc.CallOption) (*CreateNetdevResponse, error) {
 	out := new(CreateNetdevResponse)
 	err := c.cc.Invoke(ctx, "/containerd.services.pod.v1.Pod/CreateNetdev", in, out, opts...)
@@ -137,6 +148,8 @@ type PodServer interface {
 	AssignIPAddress(context.Context, *AssignIPAddressRequest) (*AssignIPAddressResponse, error)
 	// ApplyRoute adds a route in the pod sandbox's network namespace.
 	ApplyRoute(context.Context, *ApplyRouteRequest) (*ApplyRouteResponse, error)
+	// ApplyRule adds an ip rule in the pod sandbox's network namespace.
+	ApplyRule(context.Context, *ApplyRuleRequest) (*ApplyRuleResponse, error)
 	// CreateNetdev creates a new Linux network device inside the pod
 	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
 	// and macvlan device types.
@@ -165,6 +178,9 @@ func (UnimplementedPodServer) AssignIPAddress(context.Context, *AssignIPAddressR
 }
 func (UnimplementedPodServer) ApplyRoute(context.Context, *ApplyRouteRequest) (*ApplyRouteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApplyRoute not implemented")
+}
+func (UnimplementedPodServer) ApplyRule(context.Context, *ApplyRuleRequest) (*ApplyRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApplyRule not implemented")
 }
 func (UnimplementedPodServer) CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNetdev not implemented")
@@ -290,6 +306,24 @@ func _Pod_ApplyRoute_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Pod_ApplyRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyRuleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PodServer).ApplyRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.pod.v1.Pod/ApplyRule",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PodServer).ApplyRule(ctx, req.(*ApplyRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Pod_CreateNetdev_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateNetdevRequest)
 	if err := dec(in); err != nil {
@@ -338,6 +372,10 @@ var Pod_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ApplyRoute",
 			Handler:    _Pod_ApplyRoute_Handler,
+		},
+		{
+			MethodName: "ApplyRule",
+			Handler:    _Pod_ApplyRule_Handler,
 		},
 		{
 			MethodName: "CreateNetdev",
