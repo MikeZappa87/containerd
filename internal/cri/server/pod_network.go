@@ -516,6 +516,13 @@ func moveRDMADevice(netnsPath string, deviceName string, targetName string) (*ne
 		return nil, fmt.Errorf("failed to query RDMA netns mode: %w", err)
 	}
 
+	// In shared mode the RDMA device is already visible in all namespaces.
+	// Moving the underlying net device would remove it from the root
+	// namespace, potentially breaking other containers that rely on it.
+	if mode == "shared" {
+		return &networking.MoveDeviceResult{DeviceName: targetName}, nil
+	}
+
 	// Find the underlying net device for this RDMA device via sysfs.
 	netDevName, err := rdmaToNetDev(deviceName)
 	if err != nil {
@@ -523,15 +530,12 @@ func moveRDMADevice(netnsPath string, deviceName string, targetName string) (*ne
 	}
 
 	// Move the underlying net device into the target namespace.
+	// In exclusive mode the kernel moves the RDMA device along with
+	// the net device automatically.
 	result, err := moveNetDevice(netnsPath, netDevName, targetName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to move net device %s (for RDMA %s): %w", netDevName, deviceName, err)
 	}
-
-	// In exclusive mode the kernel moved the RDMA device along with the
-	// net device. In shared mode the RDMA device was already visible in
-	// all namespaces — nothing extra to do.
-	_ = mode
 
 	return result, nil
 }
