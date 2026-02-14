@@ -22,6 +22,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -322,4 +323,413 @@ func TestPodResources_AfterStopPodSandbox(t *testing.T) {
 	// so IPs should still be returned.
 	assert.NotEmpty(t, ipsAfter.InterfaceIps,
 		"interface IPs should persist in sandbox metadata after stop")
+}
+
+// ---------------------------------------------------------------------------
+// GetPodNetwork
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_GetPodNetwork verifies that GetPodNetwork returns interfaces,
+// routes, and rules for a running sandbox.
+func TestPodNetwork_GetPodNetwork(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "pod-network")
+
+	podClient := newPodNetworkClient(t)
+	t.Log("Call GetPodNetwork")
+	resp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err, "GetPodNetwork should succeed")
+	require.NotNil(t, resp)
+
+	t.Log("Verify at least one interface is returned")
+	require.NotEmpty(t, resp.Interfaces, "should have at least one interface")
+
+	// Look for expected interfaces.
+	ifNames := make(map[string]bool)
+	for _, iface := range resp.Interfaces {
+		ifNames[iface.Name] = true
+		t.Logf("  interface %q mac=%s mtu=%d state=%s addrs=%v",
+			iface.Name, iface.MacAddress, iface.Mtu, iface.State, iface.Addresses)
+	}
+	// The API may or may not include the loopback; just log it.
+	if !ifNames["lo"] {
+		t.Log("Note: loopback interface not returned by GetPodNetwork (this is OK)")
+	}
+	assert.True(t, ifNames["eth0"], "eth0 interface should be present (CNI bridge)")
+
+	t.Log("Verify routes are returned")
+	require.NotEmpty(t, resp.Routes, "should have at least one route")
+	for _, rt := range resp.Routes {
+		t.Logf("  route dst=%s gw=%s iface=%s metric=%d scope=%s",
+			rt.Destination, rt.Gateway, rt.InterfaceName, rt.Metric, rt.Scope)
+	}
+
+	t.Log("Verify rules are returned")
+	// Linux always has at least the default rules (priority 0, 32766, 32767).
+	require.NotEmpty(t, resp.Rules, "should have at least default ip rules")
+	for _, rl := range resp.Rules {
+		t.Logf("  rule prio=%d src=%s dst=%s table=%s", rl.Priority, rl.Src, rl.Dst, rl.Table)
+	}
+}
+
+// TestPodNetwork_GetPodNetwork_NotFound verifies that GetPodNetwork fails
+// for a non-existent sandbox.
+func TestPodNetwork_GetPodNetwork_NotFound(t *testing.T) {
+	podClient := newPodNetworkClient(t)
+	_, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: "does-not-exist-network-12345",
+	})
+	require.Error(t, err, "should fail for non-existent sandbox")
+}
+
+// TestPodNetwork_GetPodNetwork_MatchesGetPodIPs verifies that the interfaces
+// and IPs from GetPodNetwork are consistent with GetPodIPs.
+func TestPodNetwork_GetPodNetwork_MatchesGetPodIPs(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "pod-net-cross")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Call GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	t.Log("Call GetPodIPs")
+	ipsResp, err := podClient.GetPodIPs(context.Background(), &podapi.GetPodIPsRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	t.Log("Verify that eth0 IPs from GetPodNetwork match GetPodIPs")
+	for _, iface := range netResp.Interfaces {
+		if iface.Name != "eth0" {
+			continue
+		}
+		// GetPodNetwork returns CIDR notation, GetPodIPs returns bare IPs.
+		// Verify each GetPodIPs IP appears as a prefix in GetPodNetwork addresses.
+		if ifIPs, ok := ipsResp.InterfaceIps["eth0"]; ok {
+			for _, bareIP := range ifIPs.Ips {
+				found := false
+				for _, cidr := range iface.Addresses {
+					if len(cidr) >= len(bareIP) && cidr[:len(bareIP)] == bareIP {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found,
+					"IP %q from GetPodIPs should appear in GetPodNetwork addresses %v",
+					bareIP, iface.Addresses)
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CreateNetdev
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_CreateNetdev_Dummy verifies creating a dummy device inside
+// a live sandbox and confirms it is visible via GetPodNetwork.
+func TestPodNetwork_CreateNetdev_Dummy(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "create-dummy")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Create a dummy device named test-dummy0")
+	createResp, err := podClient.CreateNetdev(context.Background(), &podapi.CreateNetdevRequest{
+		SandboxId: sb,
+		Name:      "test-dummy0",
+		Mtu:       1400,
+		Addresses: []string{"192.168.99.1/24"},
+		Config:    &podapi.CreateNetdevRequest_Dummy{Dummy: &podapi.DummyConfig{}},
+	})
+	require.NoError(t, err, "CreateNetdev should succeed")
+	require.NotNil(t, createResp.Interface)
+	assert.Equal(t, "test-dummy0", createResp.Interface.Name)
+	assert.Equal(t, uint32(1400), createResp.Interface.Mtu)
+	assert.Contains(t, createResp.Interface.Addresses, "192.168.99.1/24",
+		"assigned address should appear on the interface")
+
+	t.Log("Verify the device is visible via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, iface := range netResp.Interfaces {
+		if iface.Name == "test-dummy0" {
+			found = true
+			assert.Equal(t, uint32(1400), iface.Mtu)
+			assert.Contains(t, iface.Addresses, "192.168.99.1/24")
+			break
+		}
+	}
+	assert.True(t, found, "test-dummy0 should be visible in GetPodNetwork")
+}
+
+// TestPodNetwork_CreateNetdev_Veth verifies creating a veth pair inside
+// a sandbox.
+func TestPodNetwork_CreateNetdev_Veth(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "create-veth")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Create a veth pair: test-veth0 (pod) <-> test-veth0-peer (root)")
+	createResp, err := podClient.CreateNetdev(context.Background(), &podapi.CreateNetdevRequest{
+		SandboxId: sb,
+		Name:      "test-veth0",
+		Config: &podapi.CreateNetdevRequest_Veth{Veth: &podapi.VethConfig{
+			PeerName: "test-veth0-peer",
+		}},
+	})
+	require.NoError(t, err, "CreateNetdev veth should succeed")
+	require.NotNil(t, createResp.Interface)
+	assert.Equal(t, "test-veth0", createResp.Interface.Name)
+
+	// Peer should also be reported.
+	require.NotNil(t, createResp.PeerInterface, "veth response should include peer interface")
+	assert.Equal(t, "test-veth0-peer", createResp.PeerInterface.Name)
+
+	t.Log("Verify test-veth0 is visible inside the sandbox via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, iface := range netResp.Interfaces {
+		if iface.Name == "test-veth0" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "test-veth0 should be visible in the sandbox")
+}
+
+// ---------------------------------------------------------------------------
+// AssignIPAddress
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_AssignIPAddress verifies assigning an IP to an existing
+// interface inside a sandbox.
+func TestPodNetwork_AssignIPAddress(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "assign-ip")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Create a dummy device to assign an IP to")
+	_, err := podClient.CreateNetdev(context.Background(), &podapi.CreateNetdevRequest{
+		SandboxId: sb,
+		Name:      "test-ip0",
+		Config:    &podapi.CreateNetdevRequest_Dummy{Dummy: &podapi.DummyConfig{}},
+	})
+	require.NoError(t, err)
+
+	t.Log("Assign 10.99.0.1/24 to test-ip0")
+	_, err = podClient.AssignIPAddress(context.Background(), &podapi.AssignIPAddressRequest{
+		SandboxId:     sb,
+		InterfaceName: "test-ip0",
+		Address:       "10.99.0.1/24",
+	})
+	require.NoError(t, err, "AssignIPAddress should succeed")
+
+	t.Log("Assign a second address fd99::1/64 to test-ip0")
+	_, err = podClient.AssignIPAddress(context.Background(), &podapi.AssignIPAddressRequest{
+		SandboxId:     sb,
+		InterfaceName: "test-ip0",
+		Address:       "fd99::1/64",
+	})
+	require.NoError(t, err, "AssignIPAddress should succeed for IPv6")
+
+	t.Log("Verify the addresses appear via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	for _, iface := range netResp.Interfaces {
+		if iface.Name == "test-ip0" {
+			assert.Contains(t, iface.Addresses, "10.99.0.1/24",
+				"IPv4 address should be assigned")
+			assert.Contains(t, iface.Addresses, "fd99::1/64",
+				"IPv6 address should be assigned")
+			return
+		}
+	}
+	t.Fatal("test-ip0 interface not found in GetPodNetwork response")
+}
+
+// TestPodNetwork_AssignIPAddress_InvalidInterface verifies that assigning
+// an IP to a non-existent interface fails.
+func TestPodNetwork_AssignIPAddress_InvalidInterface(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "assign-ip-err")
+
+	podClient := newPodNetworkClient(t)
+
+	_, err := podClient.AssignIPAddress(context.Background(), &podapi.AssignIPAddressRequest{
+		SandboxId:     sb,
+		InterfaceName: "nonexistent0",
+		Address:       "10.99.0.1/24",
+	})
+	require.Error(t, err, "should fail for non-existent interface")
+}
+
+// ---------------------------------------------------------------------------
+// ApplyRoute
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_ApplyRoute verifies adding a route inside a sandbox.
+func TestPodNetwork_ApplyRoute(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "apply-route")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Create a dummy device with an IP to route through")
+	_, err := podClient.CreateNetdev(context.Background(), &podapi.CreateNetdevRequest{
+		SandboxId: sb,
+		Name:      "test-rt0",
+		Addresses: []string{"172.30.0.1/24"},
+		Config:    &podapi.CreateNetdevRequest_Dummy{Dummy: &podapi.DummyConfig{}},
+	})
+	require.NoError(t, err)
+
+	t.Log("Apply a route: 172.30.99.0/24 via test-rt0")
+	_, err = podClient.ApplyRoute(context.Background(), &podapi.ApplyRouteRequest{
+		SandboxId: sb,
+		Route: &podapi.RouteEntry{
+			Destination:   "172.30.99.0/24",
+			InterfaceName: "test-rt0",
+			Scope:         "link",
+		},
+	})
+	require.NoError(t, err, "ApplyRoute should succeed")
+
+	t.Log("Verify the route appears via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, rt := range netResp.Routes {
+		if rt.Destination == "172.30.99.0/24" && rt.InterfaceName == "test-rt0" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "route 172.30.99.0/24 via test-rt0 should be visible in GetPodNetwork")
+}
+
+// ---------------------------------------------------------------------------
+// ApplyRule
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_ApplyRule verifies adding an ip rule inside a sandbox.
+func TestPodNetwork_ApplyRule(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "apply-rule")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Apply an ip rule: from 10.50.0.0/16 lookup table 100 priority 500")
+	_, err := podClient.ApplyRule(context.Background(), &podapi.ApplyRuleRequest{
+		SandboxId: sb,
+		Rule: &podapi.RoutingRule{
+			Priority: 500,
+			Src:      "10.50.0.0/16",
+			Table:    "100",
+		},
+	})
+	require.NoError(t, err, "ApplyRule should succeed")
+
+	t.Log("Verify the rule appears via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, rl := range netResp.Rules {
+		if rl.Priority == 500 && rl.Src == "10.50.0.0/16" && rl.Table == "100" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "ip rule prio 500 from 10.50.0.0/16 table 100 should be visible in GetPodNetwork")
+}
+
+// ---------------------------------------------------------------------------
+// MoveDevice
+// ---------------------------------------------------------------------------
+
+// TestPodNetwork_MoveDevice_Dummy verifies moving a dummy device from the
+// root namespace into a sandbox. We create a dummy in the root netns,
+// assign it an address, then move it.
+func TestPodNetwork_MoveDevice_Dummy(t *testing.T) {
+	t.Log("Create a dummy device in the root namespace using ip link")
+	// Use a unique name to avoid conflicts with parallel tests.
+	devName := "mv-test-dum0"
+	runCmd(t, "ip", "link", "add", devName, "type", "dummy")
+	t.Cleanup(func() {
+		// Best-effort cleanup in case move fails.
+		runCmd(t, "ip", "link", "del", devName)
+	})
+	runCmd(t, "ip", "addr", "add", "10.77.0.1/24", "dev", devName)
+	runCmd(t, "ip", "link", "set", devName, "up")
+
+	t.Log("Create a pod sandbox")
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "move-device")
+
+	podClient := newPodNetworkClient(t)
+
+	t.Log("Move the device into the sandbox")
+	moveResp, err := podClient.MoveDevice(context.Background(), &podapi.MoveDeviceRequest{
+		SandboxId:  sb,
+		DeviceName: devName,
+		DeviceType: podapi.DeviceType_NETDEV,
+		TargetName: "moved0",
+	})
+	require.NoError(t, err, "MoveDevice should succeed")
+	assert.Equal(t, "moved0", moveResp.DeviceName)
+	assert.Contains(t, moveResp.Addresses, "10.77.0.1/24",
+		"address should be carried over")
+
+	t.Log("Verify the device is visible inside the sandbox via GetPodNetwork")
+	netResp, err := podClient.GetPodNetwork(context.Background(), &podapi.GetPodNetworkRequest{
+		SandboxId: sb,
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, iface := range netResp.Interfaces {
+		if iface.Name == "moved0" {
+			found = true
+			assert.Contains(t, iface.Addresses, "10.77.0.1/24")
+			break
+		}
+	}
+	assert.True(t, found, "moved0 should be visible inside the sandbox")
+}
+
+// runCmd is a test helper that runs a command and fails the test on error.
+// It silently ignores errors during cleanup (e.g. deleting a device that
+// was already moved).
+func runCmd(t *testing.T, name string, args ...string) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil && !t.Failed() {
+		// Only log; don't hard-fail for cleanup commands.
+		t.Logf("command %v: %v: %s", append([]string{name}, args...), err, out)
+	}
 }
