@@ -99,20 +99,25 @@ func init() {
 
 type podService struct {
 	provider server.PodResourcesProvider
-	api.UnimplementedPodNetworkServer
+	api.UnimplementedPodNetworkLifecycleServer
+	api.UnimplementedPodNetworkManagementServer
 
 	// dedicated is non-nil when the plugin runs its own gRPC server.
 	dedicated *grpc.Server
 	listener  net.Listener
 }
 
-var _ api.PodNetworkServer = (*podService)(nil)
+var (
+	_ api.PodNetworkLifecycleServer  = (*podService)(nil)
+	_ api.PodNetworkManagementServer = (*podService)(nil)
+)
 
 // Register registers the Pod gRPC service with the shared containerd
 // gRPC server. The service is always registered on the main socket.
 // When a dedicated address is also configured, it is available on both.
 func (s *podService) Register(srv *grpc.Server) error {
-	api.RegisterPodNetworkServer(srv, s)
+	api.RegisterPodNetworkLifecycleServer(srv, s)
+	api.RegisterPodNetworkManagementServer(srv, s)
 	return nil
 }
 
@@ -159,7 +164,8 @@ func (s *podService) startDedicatedServer(ctx context.Context, config *Config) e
 	}
 
 	srv := grpc.NewServer()
-	api.RegisterPodNetworkServer(srv, s)
+	api.RegisterPodNetworkLifecycleServer(srv, s)
+	api.RegisterPodNetworkManagementServer(srv, s)
 
 	s.dedicated = srv
 	s.listener = l
@@ -184,6 +190,30 @@ func (s *podService) GetPodResources(ctx context.Context, req *api.GetPodResourc
 
 	return &api.GetPodResourcesResponse{
 		PodNetnsPath: netnsPath,
+	}, nil
+}
+
+// SetupPodNetwork is handled internally by the CRI sandbox lifecycle.
+// This RPC is exposed for external orchestration use cases where the caller
+// manages sandbox creation independently.
+func (s *podService) SetupPodNetwork(ctx context.Context, req *api.SetupPodNetworkRequest) (*api.SetupPodNetworkResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).Debug("SetupPodNetwork called via gRPC service (no-op: handled by CRI lifecycle)")
+	// Setup is managed by the CRI sandbox lifecycle using the gRPC network
+	// plugin client directly. Return unimplemented for external callers.
+	return nil, fmt.Errorf("SetupPodNetwork is managed by the CRI sandbox lifecycle and cannot be invoked externally")
+}
+
+// TeardownPodNetwork is handled internally by the CRI sandbox lifecycle.
+func (s *podService) TeardownPodNetwork(ctx context.Context, req *api.TeardownPodNetworkRequest) (*api.TeardownPodNetworkResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).Debug("TeardownPodNetwork called via gRPC service (no-op: handled by CRI lifecycle)")
+	return nil, fmt.Errorf("TeardownPodNetwork is managed by the CRI sandbox lifecycle and cannot be invoked externally")
+}
+
+// CheckHealth reports the health of the pod network service.
+func (s *podService) CheckHealth(ctx context.Context, req *api.CheckHealthRequest) (*api.CheckHealthResponse, error) {
+	return &api.CheckHealthResponse{
+		Ready:   true,
+		Message: "containerd networking service is running",
 	}, nil
 }
 
@@ -385,10 +415,12 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("name", req.Name).Debug("create netdev")
 
 	domReq := corenetworking.CreateNetdevRequest{
-		SandboxID: req.SandboxId,
-		Name:      req.Name,
-		MTU:       req.Mtu,
-		Addresses: req.Addresses,
+		SandboxID:   req.SandboxId,
+		Name:        req.Name,
+		MTU:         req.Mtu,
+		Addresses:   req.Addresses,
+		HostNetwork: req.HostNetwork,
+		Master:      req.Master,
 	}
 
 	switch cfg := req.Config.(type) {
@@ -396,6 +428,7 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 		domReq.Veth = &corenetworking.VethConfig{
 			PeerName:      cfg.Veth.PeerName,
 			PeerNetNSPath: cfg.Veth.PeerNetnsPath,
+			PeerMaster:    cfg.Veth.PeerMaster,
 		}
 	case *api.CreateNetdevRequest_Vxlan:
 		domReq.Vxlan = &corenetworking.VxlanConfig{
@@ -420,6 +453,13 @@ func (s *podService) CreateNetdev(ctx context.Context, req *api.CreateNetdevRequ
 			Parent:     cfg.Macvlan.Parent,
 			Mode:       corenetworking.MacvlanMode(cfg.Macvlan.Mode),
 			MACAddress: cfg.Macvlan.MacAddress,
+		}
+	case *api.CreateNetdevRequest_Bridge:
+		domReq.Bridge = &corenetworking.BridgeConfig{
+			STPEnabled:    cfg.Bridge.StpEnabled,
+			VLANFiltering: cfg.Bridge.VlanFiltering,
+			ForwardDelay:  cfg.Bridge.ForwardDelay,
+			DefaultPVID:   cfg.Bridge.DefaultPvid,
 		}
 	default:
 		return nil, fmt.Errorf("exactly one device config must be specified")
@@ -454,4 +494,15 @@ func networkInterfaceToAPI(iface corenetworking.NetworkInterface) *api.NetworkIn
 		State:      iface.State,
 		Addresses:  iface.Addresses,
 	}
+}
+
+// AttachInterface attaches an existing interface to a master device.
+func (s *podService) AttachInterface(ctx context.Context, req *api.AttachInterfaceRequest) (*api.AttachInterfaceResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("interface", req.InterfaceName).WithField("master", req.Master).Debug("attach interface")
+
+	if err := s.provider.AttachInterface(ctx, req.SandboxId, req.InterfaceName, req.Master, req.HostNetwork); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &api.AttachInterfaceResponse{}, nil
 }

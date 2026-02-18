@@ -52,6 +52,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
 			UseInternalLoopback:        false,
+			DisableCNI:                 false,
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runhcs-wcow-process",

@@ -20,8 +20,40 @@ package containerd.services.networking.v1;
 
 option go_package = "github.com/containerd/containerd/api/services/networking/v1;networking";
 
-// PodNetwork provides an API for managing pod-level network resources.
-service PodNetwork {
+// PodNetworkLifecycle provides the core lifecycle API for pod networking.
+// It replaces CNI as the networking interface for containerd's CRI plugin.
+// An external gRPC server implementing this service is responsible for
+// setting up and tearing down pod networks. This is the minimal service
+// that a CNI replacement must implement.
+service PodNetworkLifecycle {
+	// SetupPodNetwork configures networking for a newly created pod
+	// sandbox. This is called during RunPodSandbox after the network
+	// namespace has been created but before the sandbox containers
+	// start. The implementation is expected to attach the pod's network
+	// namespace to the cluster network, assign IP addresses, set up
+	// routes, and return the resulting network configuration.
+	rpc SetupPodNetwork(SetupPodNetworkRequest) returns (SetupPodNetworkResponse);
+
+	// TeardownPodNetwork removes all networking configuration for a pod
+	// sandbox. This is called during StopPodSandbox before the network
+	// namespace is destroyed. The implementation must release all
+	// allocated resources (IPs, routes, interfaces) for the pod.
+	rpc TeardownPodNetwork(TeardownPodNetworkRequest) returns (TeardownPodNetworkResponse);
+
+	// CheckHealth verifies that the network plugin is operational and
+	// ready to accept requests. Containerd calls this during CRI Status
+	// checks to determine the NetworkReady condition. The plugin should
+	// return a healthy response when it is fully initialized and able
+	// to set up pod networks.
+	rpc CheckHealth(CheckHealthRequest) returns (CheckHealthResponse);
+}
+
+// PodNetworkManagement provides an extended API for querying and managing
+// pod-level network resources (interfaces, IPs, routes, devices). Plugins
+// that only need to replace the CNI lifecycle do NOT need to implement
+// this service. It is intended for advanced use cases such as DRA,
+// multi-NIC, SR-IOV, and RDMA device management.
+service PodNetworkManagement {
 	// GetPodResources returns resources associated with a pod sandbox.
 	rpc GetPodResources(GetPodResourcesRequest) returns (GetPodResourcesResponse);
 
@@ -48,10 +80,18 @@ service PodNetwork {
 	// ApplyRule adds an ip rule in the pod sandbox's network namespace.
 	rpc ApplyRule(ApplyRuleRequest) returns (ApplyRuleResponse);
 
-	// CreateNetdev creates a new Linux network device inside the pod
-	// sandbox's network namespace. Supports veth, vxlan, dummy, ipvlan,
-	// and macvlan device types.
+	// CreateNetdev creates a new Linux network device. By default the
+	// device is created inside the pod sandbox's network namespace.
+	// When host_network is true, it is created in the host (root)
+	// namespace instead (useful for bridges and overlay endpoints).
+	// Supports veth, vxlan, dummy, bridge, ipvlan, and macvlan types.
 	rpc CreateNetdev(CreateNetdevRequest) returns (CreateNetdevResponse);
+
+	// AttachInterface attaches an existing interface to a master device
+	// (e.g. a Linux bridge). Both devices must be in the same network
+	// namespace. This is used, for example, to enslave a vxlan or veth
+	// peer to a bridge in the host namespace.
+	rpc AttachInterface(AttachInterfaceRequest) returns (AttachInterfaceResponse);
 }
 
 // DeviceType indicates the kind of device to move into the pod netns.
@@ -59,6 +99,120 @@ enum DeviceType {
 	NETDEV = 0;
 	RDMA = 1;
 }
+
+// ———————————————————————————————————————————————
+// SetupPodNetwork
+// ———————————————————————————————————————————————
+
+// PortMapping describes a port mapping for the pod sandbox.
+message PortMapping {
+	// Protocol of the port mapping (e.g. "tcp", "udp", "sctp").
+	string protocol = 1;
+	// Port number within the container.
+	uint32 container_port = 2;
+	// Port number on the host.
+	uint32 host_port = 3;
+	// Host IP to bind to.
+	string host_ip = 4;
+}
+
+// DNSConfig specifies DNS settings for the pod.
+message DNSConfig {
+	repeated string servers = 1;
+	repeated string searches = 2;
+	repeated string options = 3;
+}
+
+message SetupPodNetworkRequest {
+	// Sandbox identifier.
+	string sandbox_id = 1;
+
+	// Path to the pod's network namespace (e.g. "/proc/12345/ns/net"
+	// or "/run/netns/cni-xxxx").
+	string netns_path = 2;
+
+	// Pod name.
+	string pod_name = 3;
+
+	// Pod namespace (Kubernetes namespace).
+	string pod_namespace = 4;
+
+	// Pod UID.
+	string pod_uid = 5;
+
+	// Annotations from the PodSandboxConfig.
+	map<string, string> annotations = 6;
+
+	// Labels from the PodSandboxConfig.
+	map<string, string> labels = 7;
+
+	// Port mappings requested by the pod.
+	repeated PortMapping port_mappings = 8;
+
+	// DNS configuration for the pod.
+	DNSConfig dns_config = 9;
+
+	// Cgroup parent path for the pod.
+	string cgroup_parent = 10;
+
+	// Result from the previous plugin in the chain. The primary
+	// (first) plugin will receive this as nil/empty. Subsequent
+	// chained plugins receive the accumulated result from all
+	// preceding plugins so they can inspect or augment it.
+	SetupPodNetworkResponse prev_result = 11;
+}
+
+message SetupPodNetworkResponse {
+	// All interfaces created/configured inside the pod netns.
+	repeated NetworkInterface interfaces = 1;
+
+	// All routes configured inside the pod netns.
+	repeated RouteEntry routes = 2;
+
+	// DNS configuration applied.
+	DNSConfig dns = 3;
+}
+
+// ———————————————————————————————————————————————
+// TeardownPodNetwork
+// ———————————————————————————————————————————————
+
+message TeardownPodNetworkRequest {
+	// Sandbox identifier.
+	string sandbox_id = 1;
+
+	// Path to the pod's network namespace. May be empty if the netns
+	// has already been closed.
+	string netns_path = 2;
+
+	// Pod name.
+	string pod_name = 3;
+
+	// Pod namespace (Kubernetes namespace).
+	string pod_namespace = 4;
+
+	// Pod UID.
+	string pod_uid = 5;
+
+	// Annotations from the PodSandboxConfig.
+	map<string, string> annotations = 6;
+
+	// Labels from the PodSandboxConfig.
+	map<string, string> labels = 7;
+
+	// Port mappings that were requested during setup.
+	repeated PortMapping port_mappings = 8;
+
+	// Cgroup parent path for the pod.
+	string cgroup_parent = 9;
+
+	// The final network result from the setup phase. This allows
+	// teardown plugins to know what interfaces, IPs, and routes
+	// were configured so they can clean up appropriately.
+	SetupPodNetworkResponse prev_result = 10;
+}
+
+message TeardownPodNetworkResponse {}
 
 // ———————————————————————————————————————————————
 // GetPodResources
@@ -292,6 +446,12 @@ message VethConfig {
 	// Optional: network namespace path to place the peer end into.
 	// If empty, the peer stays in the root namespace.
 	string peer_netns_path = 2;
+
+	// Optional: master (bridge) device to attach the peer end to.
+	// For example, setting this to "br0" enslaves the host-side
+	// veth end to the bridge, which is the standard pattern for
+	// bridge-based pod networking.
+	string peer_master = 3;
 }
 
 // VxlanConfig creates a VXLAN tunnel endpoint inside the pod netns.
@@ -317,6 +477,24 @@ message VxlanConfig {
 
 	// Whether to enable learning of remote MAC/IP entries.
 	bool learning = 7;
+}
+
+// BridgeConfig creates a Linux bridge device. When host_network is set
+// on the CreateNetdevRequest the bridge is created in the root namespace,
+// which is the typical topology for node-level bridges shared across pods.
+message BridgeConfig {
+	// Whether to enable STP (Spanning Tree Protocol). Default false.
+	bool stp_enabled = 1;
+
+	// Whether to enable VLAN filtering on the bridge. Default false.
+	bool vlan_filtering = 2;
+
+	// Forward delay in centiseconds (kernel default is 1500 = 15 s).
+	// Set to a low value (e.g. 0) for fast convergence when STP is off.
+	uint32 forward_delay = 3;
+
+	// Optional: default PVID for untagged traffic (default 1).
+	uint32 default_pvid = 4;
 }
 
 // DummyConfig creates a dummy interface. No additional parameters needed
@@ -351,7 +529,7 @@ message CreateNetdevRequest {
 	// Sandbox to create the device in.
 	string sandbox_id = 1;
 
-	// Name of the device inside the pod netns (e.g. "eth0", "vxlan100").
+	// Name of the device (e.g. "eth0", "vxlan100", "br0").
 	string name = 2;
 
 	// Optional: MTU for the new device. 0 means use the kernel default.
@@ -361,6 +539,18 @@ message CreateNetdevRequest {
 	// notation (e.g. "10.0.0.2/24", "fd00::2/64").
 	repeated string addresses = 4;
 
+	// When true, the device is created in the host (root) network namespace
+	// instead of the pod's netns. This is necessary for infrastructure
+	// devices like bridges and vxlan tunnel endpoints that live on the host.
+	// Defaults to false (pod netns).
+	bool host_network = 5;
+
+	// Optional: master (bridge) device to attach this device to after
+	// creation. Both the new device and the master must be in the same
+	// namespace. For example, creating a vxlan with master="br0" will
+	// enslave the vxlan to the bridge.
+	string master = 6;
+
 	// Device-type-specific configuration. Exactly one must be set.
 	oneof config {
 		VethConfig    veth    = 10;
@@ -368,6 +558,7 @@ message CreateNetdevRequest {
 		DummyConfig   dummy   = 12;
 		IpvlanConfig  ipvlan  = 13;
 		MacvlanConfig macvlan = 14;
+		BridgeConfig  bridge  = 15;
 	}
 }
 
@@ -377,4 +568,42 @@ message CreateNetdevResponse {
 
 	// For veth: the peer interface info (in whichever namespace it lives).
 	NetworkInterface peer_interface = 2;
+}
+
+// ———————————————————————————————————————————————
+// AttachInterface
+// ———————————————————————————————————————————————
+
+message AttachInterfaceRequest {
+	// Sandbox identifier. Used to resolve the pod netns when
+	// host_network is false. May be empty when operating purely
+	// in the host namespace.
+	string sandbox_id = 1;
+
+	// Name of the interface to attach (the slave/lower device).
+	string interface_name = 2;
+
+	// Name of the master device to attach to (e.g. a Linux bridge).
+	string master = 3;
+
+	// When true, the operation is performed in the host (root) network
+	// namespace. Defaults to false (pod netns).
+	bool host_network = 4;
+}
+
+message AttachInterfaceResponse {}
+
+// ———————————————————————————————————————————————
+// CheckHealth
+// ———————————————————————————————————————————————
+
+message CheckHealthRequest {}
+
+message CheckHealthResponse {
+	// Whether the network plugin is healthy and ready to handle requests.
+	bool ready = 1;
+
+	// Human-readable message providing additional detail about the
+	// plugin's health status (e.g. reason for being unhealthy).
+	string message = 2;
 }

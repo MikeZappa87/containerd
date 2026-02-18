@@ -575,20 +575,28 @@ func rdmaToNetDev(rdmaDevice string) (string, error) {
 	return "", fmt.Errorf("no net device found for RDMA device %s", rdmaDevice)
 }
 
-// CreateNetdev creates a new Linux network device inside the pod's network namespace.
+// CreateNetdev creates a new Linux network device. When HostNetwork is true
+// the device is created in the host (root) namespace; otherwise it is created
+// inside the pod's network namespace.
 func (c *criService) CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	sb, err := c.sandboxStore.Get(req.SandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", req.SandboxID, err)
 	}
-	if sb.NetNSPath == "" {
+	if !req.HostNetwork && sb.NetNSPath == "" {
 		return nil, fmt.Errorf("sandbox %q has no network namespace", req.SandboxID)
 	}
 
-	return createNetdev(sb.NetNSPath, req)
+	netnsPath := sb.NetNSPath
+	if req.HostNetwork {
+		netnsPath = ""
+	}
+
+	return createNetdev(netnsPath, req)
 }
 
-// createNetdev performs the actual netlink device creation inside the given netns.
+// createNetdev performs the actual netlink device creation. When netnsPath is
+// empty the device is created in the current (host) namespace.
 func createNetdev(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	if req.Name == "" {
 		return nil, fmt.Errorf("device name is required")
@@ -605,6 +613,8 @@ func createNetdev(netnsPath string, req networking.CreateNetdevRequest) (*networ
 		return createIPVlanDevice(netnsPath, req)
 	case req.Macvlan != nil:
 		return createMacvlanDevice(netnsPath, req)
+	case req.Bridge != nil:
+		return createBridgeDevice(netnsPath, req)
 	default:
 		return nil, fmt.Errorf("exactly one device config must be specified")
 	}
@@ -689,6 +699,13 @@ func createVethDevice(netnsPath string, req networking.CreateNetdevRequest) (*ne
 		return nil, fmt.Errorf("failed to find peer veth %s: %w", cfg.PeerName, err)
 	}
 
+	// Attach peer to a master (bridge) if requested.
+	if cfg.PeerMaster != "" {
+		if err := enslaveToMaster(peerLink, cfg.PeerMaster); err != nil {
+			return nil, fmt.Errorf("failed to attach peer %s to master %s: %w", cfg.PeerName, cfg.PeerMaster, err)
+		}
+	}
+
 	if cfg.PeerNetNSPath != "" {
 		peerNS, err := netns.GetFromPath(cfg.PeerNetNSPath)
 		if err != nil {
@@ -722,13 +739,14 @@ func createVethDevice(netnsPath string, req networking.CreateNetdevRequest) (*ne
 	return result, nil
 }
 
-// createVxlanDevice creates a VXLAN tunnel endpoint inside the pod netns.
+// createVxlanDevice creates a VXLAN tunnel endpoint. When netnsPath is empty
+// the device is created in the host namespace.
 func createVxlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	cfg := req.Vxlan
 
 	result := &networking.CreateNetdevResult{}
 
-	err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+	create := func() error {
 		vxlan := &netlink.Vxlan{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: req.Name,
@@ -790,6 +808,13 @@ func createVxlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*n
 			}
 		}
 
+		// Attach to master if requested.
+		if req.Master != "" {
+			if err := enslaveToMaster(link, req.Master); err != nil {
+				return fmt.Errorf("failed to attach %s to master %s: %w", req.Name, req.Master, err)
+			}
+		}
+
 		// Bring up and snapshot.
 		iface, err := bringUpAndSnapshot(req.Name)
 		if err != nil {
@@ -797,10 +822,19 @@ func createVxlanDevice(netnsPath string, req networking.CreateNetdevRequest) (*n
 		}
 		result.Interface = iface
 		return nil
-	})
+	}
 
-	if err != nil {
-		return nil, err
+	if netnsPath == "" {
+		// Host namespace.
+		if err := create(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+			return create()
+		}); err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }
@@ -1072,4 +1106,164 @@ func toNetlinkMacvlanMode(mode networking.MacvlanMode) netlink.MacvlanMode {
 	default:
 		return netlink.MACVLAN_MODE_BRIDGE
 	}
+}
+
+// createBridgeDevice creates a Linux bridge device. When netnsPath is empty
+// the bridge is created in the host namespace (the typical topology for
+// node-level bridges shared across pods).
+func createBridgeDevice(netnsPath string, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
+	cfg := req.Bridge
+
+	result := &networking.CreateNetdevResult{}
+
+	create := func() error {
+		bridge := &netlink.Bridge{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: req.Name,
+			},
+		}
+
+		if req.MTU > 0 {
+			bridge.LinkAttrs.MTU = int(req.MTU)
+		}
+
+		if err := netlink.LinkAdd(bridge); err != nil {
+			// If the bridge already exists and we're in the host namespace,
+			// treat it as success (idempotent).
+			if netnsPath == "" {
+				existing, lookupErr := netlink.LinkByName(req.Name)
+				if lookupErr == nil {
+					iface := linkToNetworkInterface(existing)
+					result.Interface = iface
+					return nil
+				}
+			}
+			return fmt.Errorf("failed to create bridge %s: %w", req.Name, err)
+		}
+
+		link, err := netlink.LinkByName(req.Name)
+		if err != nil {
+			return fmt.Errorf("failed to find bridge %s after creation: %w", req.Name, err)
+		}
+
+		// Apply STP setting.
+		if cfg.STPEnabled {
+			if err := setSTPEnabled(req.Name, true); err != nil {
+				return fmt.Errorf("failed to enable STP on %s: %w", req.Name, err)
+			}
+		}
+
+		// Apply VLAN filtering.
+		if cfg.VLANFiltering {
+			if err := setVLANFiltering(req.Name, true); err != nil {
+				return fmt.Errorf("failed to enable VLAN filtering on %s: %w", req.Name, err)
+			}
+		}
+
+		// Apply forward delay.
+		if cfg.ForwardDelay > 0 {
+			if err := setForwardDelay(req.Name, cfg.ForwardDelay); err != nil {
+				return fmt.Errorf("failed to set forward delay on %s: %w", req.Name, err)
+			}
+		}
+
+		// Assign addresses.
+		for _, addrStr := range req.Addresses {
+			addr, err := netlink.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address %q: %w", addrStr, err)
+			}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address %s: %w", addrStr, err)
+			}
+		}
+
+		// Bring up and snapshot.
+		iface, err := bringUpAndSnapshot(req.Name)
+		if err != nil {
+			return err
+		}
+		result.Interface = iface
+		return nil
+	}
+
+	if netnsPath == "" {
+		// Host namespace.
+		if err := create(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := cnins.WithNetNSPath(netnsPath, func(_ cnins.NetNS) error {
+			return create()
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+// setSTPEnabled writes to /sys/class/net/<bridge>/bridge/stp_state.
+func setSTPEnabled(bridge string, enabled bool) error {
+	val := "0"
+	if enabled {
+		val = "1"
+	}
+	path := fmt.Sprintf("/sys/class/net/%s/bridge/stp_state", bridge)
+	return os.WriteFile(path, []byte(val), 0644)
+}
+
+// setVLANFiltering writes to /sys/class/net/<bridge>/bridge/vlan_filtering.
+func setVLANFiltering(bridge string, enabled bool) error {
+	val := "0"
+	if enabled {
+		val = "1"
+	}
+	path := fmt.Sprintf("/sys/class/net/%s/bridge/vlan_filtering", bridge)
+	return os.WriteFile(path, []byte(val), 0644)
+}
+
+// setForwardDelay writes to /sys/class/net/<bridge>/bridge/forward_delay.
+func setForwardDelay(bridge string, centiseconds uint32) error {
+	path := fmt.Sprintf("/sys/class/net/%s/bridge/forward_delay", bridge)
+	return os.WriteFile(path, []byte(strconv.FormatUint(uint64(centiseconds), 10)), 0644)
+}
+
+// enslaveToMaster attaches a link to a master (bridge) device by name.
+func enslaveToMaster(link netlink.Link, masterName string) error {
+	master, err := netlink.LinkByName(masterName)
+	if err != nil {
+		return fmt.Errorf("master device %q not found: %w", masterName, err)
+	}
+	if err := netlink.LinkSetMaster(link, master); err != nil {
+		return fmt.Errorf("failed to set master %s on %s: %w", masterName, link.Attrs().Name, err)
+	}
+	return nil
+}
+
+// AttachInterface attaches an existing interface to a master device (e.g. a
+// Linux bridge). When hostNetwork is true the operation is performed in the
+// host (root) network namespace; otherwise it targets the pod's netns.
+func (c *criService) AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error {
+	sb, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
+	}
+	if !hostNetwork && sb.NetNSPath == "" {
+		return fmt.Errorf("sandbox %q has no network namespace", sandboxID)
+	}
+
+	attach := func() error {
+		link, err := netlink.LinkByName(interfaceName)
+		if err != nil {
+			return fmt.Errorf("interface %q not found: %w", interfaceName, err)
+		}
+		return enslaveToMaster(link, master)
+	}
+
+	if hostNetwork {
+		return attach()
+	}
+	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+		return attach()
+	})
 }

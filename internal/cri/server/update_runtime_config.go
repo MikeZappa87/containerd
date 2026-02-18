@@ -58,6 +58,13 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	if podCIDRs == "" {
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
+
+	// Skip CNI operations if CNI is disabled.
+	if c.config.DisableCNI {
+		log.G(ctx).Info("CNI is disabled, skip updating runtime config for network.")
+		return &runtime.UpdateRuntimeConfigResponse{}, nil
+	}
+
 	cidrs := strings.Split(podCIDRs, ",")
 	for i := range cidrs {
 		cidrs[i] = strings.TrimSpace(cidrs[i])

@@ -37,6 +37,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/introspection"
+	"github.com/containerd/containerd/v2/core/networking"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -135,6 +136,17 @@ type criService struct {
 	containerNameIndex *registrar.Registrar
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin map[string]cni.CNI
+	// grpcNetPlugin is an optional gRPC-backed network plugin that replaces
+	// CNI for pod network setup/teardown when configured.
+	grpcNetPlugin networking.PodNetworkPlugin
+	// grpcNetMgmtClient is an optional gRPC-backed client for the
+	// PodNetworkManagement service, providing extended operations such as
+	// GetPodIPs, MoveDevice, CreateNetdev, etc.
+	grpcNetMgmtClient networking.PodResourcesClient
+	// grpcPluginSyncer watches a directory for gRPC network plugin
+	// registration files and dynamically rebuilds the plugin chain.
+	// nil when directory-based discovery is not enabled.
+	grpcPluginSyncer *grpcPluginSyncer
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// streamServer is the streaming server serves container streaming request.
@@ -232,20 +244,24 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	c.eventMonitor = events.NewEventMonitor(&criEventHandler{c: c})
 
+	// Only set up CNI config monitors when CNI is not disabled and
+	// the gRPC network plugin is not in use.
 	c.cniNetConfMonitor = make(map[string]*cniNetConfSyncer)
-	for name, i := range c.netPlugin {
-		path := c.config.NetworkPluginConfDir
-		if name != defaultNetworkPlugin {
-			if rc, ok := c.config.Runtimes[name]; ok {
-				path = rc.NetworkPluginConfDir
+	if !c.config.DisableCNI && c.grpcNetPlugin == nil {
+		for name, i := range c.netPlugin {
+			path := c.config.NetworkPluginConfDir
+			if name != defaultNetworkPlugin {
+				if rc, ok := c.config.Runtimes[name]; ok {
+					path = rc.NetworkPluginConfDir
+				}
 			}
-		}
-		if path != "" {
-			m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+			if path != "" {
+				m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+				}
+				c.cniNetConfMonitor[name] = m
 			}
-			c.cniNetConfMonitor[name] = m
 		}
 	}
 
@@ -320,6 +336,15 @@ func (c *criService) Run(ready func()) error {
 		}()
 	}
 
+	// Start gRPC network plugin directory syncer (if enabled).
+	grpcPluginSyncerErrCh := make(chan error, 1)
+	if c.grpcPluginSyncer != nil {
+		log.L.Info("Start gRPC network plugin directory syncer")
+		go func() {
+			grpcPluginSyncerErrCh <- c.grpcPluginSyncer.syncLoop()
+		}()
+	}
+
 	// Start streaming server.
 	log.L.Info("Start streaming server")
 	streamServerErrCh := make(chan error)
@@ -340,12 +365,13 @@ func (c *criService) Run(ready func()) error {
 	c.initialized.Store(true)
 	ready()
 
-	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr error
+	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr, grpcPluginSyncerErr error
 	// Stop the whole CRI service if any of the critical service exits.
 	select {
 	case eventMonitorErr = <-eventMonitorErrCh:
 	case streamServerErr = <-streamServerErrCh:
 	case cniNetConfMonitorErr = <-cniNetConfMonitorErrCh:
+	case grpcPluginSyncerErr = <-grpcPluginSyncerErrCh:
 	}
 	if err := c.Close(); err != nil {
 		return fmt.Errorf("failed to stop cri service: %w", err)
@@ -369,6 +395,9 @@ func (c *criService) Run(ready func()) error {
 	if cniNetConfMonitorErr != nil {
 		return fmt.Errorf("cni network conf monitor error: %w", cniNetConfMonitorErr)
 	}
+	if grpcPluginSyncerErr != nil {
+		return fmt.Errorf("gRPC plugin syncer error: %w", grpcPluginSyncerErr)
+	}
 	return nil
 }
 
@@ -379,6 +408,11 @@ func (c *criService) Close() error {
 	for name, h := range c.cniNetConfMonitor {
 		if err := h.stop(); err != nil {
 			log.L.WithError(err).Errorf("failed to stop cni network conf monitor for %s", name)
+		}
+	}
+	if c.grpcPluginSyncer != nil {
+		if err := c.grpcPluginSyncer.stop(); err != nil {
+			log.L.WithError(err).Error("failed to stop gRPC plugin syncer")
 		}
 	}
 	c.eventMonitor.Stop()

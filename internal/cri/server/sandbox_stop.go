@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/networking"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -151,16 +153,25 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 
 // teardownPodNetwork removes the network from the pod
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
-	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
-	if netPlugin == nil {
-		return errors.New("cni config not initialized")
-	}
-
 	var (
 		id     = sandbox.ID
 		path   = sandbox.NetNSPath
 		config = sandbox.Config
 	)
+
+	// When CNI is disabled, delegate to the gRPC network plugin.
+	if c.config.DisableCNI {
+		if c.grpcNetPlugin != nil {
+			return c.teardownPodNetworkGRPC(ctx, sandbox)
+		}
+		return errors.New("CNI is disabled but no gRPC network plugin is configured")
+	}
+
+	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
+	if netPlugin == nil {
+		return errors.New("cni config not initialized")
+	}
+
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)
@@ -173,6 +184,64 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 	if err != nil {
 		networkPluginOperationsErrors.WithValues(networkTearDownOp).Inc()
 		return err
+	}
+	return nil
+}
+
+// teardownPodNetworkGRPC uses the gRPC PodNetwork plugin to remove
+// networking for the sandbox, replacing CNI DEL.
+func (c *criService) teardownPodNetworkGRPC(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+	var (
+		id     = sandbox.ID
+		path   = sandbox.NetNSPath
+		config = sandbox.Config
+		meta   = config.GetMetadata()
+	)
+
+	req := networking.TeardownPodNetworkRequest{
+		SandboxID:    id,
+		NetNSPath:    path,
+		PodName:      meta.GetName(),
+		PodNamespace: meta.GetNamespace(),
+		PodUID:       meta.GetUid(),
+		Annotations:  config.GetAnnotations(),
+		Labels:       config.GetLabels(),
+		CgroupParent: config.GetLinux().GetCgroupParent(),
+	}
+
+	// Reconstruct the setup result from the stored CNI result so that
+	// chained teardown plugins know what was configured during setup.
+	if sandbox.CNIResult != nil {
+		prevResult := &networking.SetupPodNetworkResult{}
+		for name, cfg := range sandbox.CNIResult.Interfaces {
+			iface := networking.NetworkInterface{
+				Name:       name,
+				MACAddress: cfg.Mac,
+			}
+			for _, ipCfg := range cfg.IPConfigs {
+				iface.Addresses = append(iface.Addresses, ipCfg.IP.String())
+			}
+			prevResult.Interfaces = append(prevResult.Interfaces, iface)
+		}
+		req.PrevResult = prevResult
+	}
+
+	for _, pm := range config.GetPortMappings() {
+		req.PortMappings = append(req.PortMappings, networking.PortMapping{
+			Protocol:      strings.ToLower(pm.Protocol.String()),
+			ContainerPort: uint32(pm.ContainerPort),
+			HostPort:      uint32(pm.HostPort),
+			HostIP:        pm.HostIp,
+		})
+	}
+
+	netStart := time.Now()
+	err := c.grpcNetPlugin.TeardownPodNetwork(ctx, req)
+	networkPluginOperations.WithValues(networkTearDownOp).Inc()
+	networkPluginOperationsLatency.WithValues(networkTearDownOp).UpdateSince(netStart)
+	if err != nil {
+		networkPluginOperationsErrors.WithValues(networkTearDownOp).Inc()
+		return fmt.Errorf("gRPC network teardown failed for sandbox %q: %w", id, err)
 	}
 	return nil
 }

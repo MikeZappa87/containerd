@@ -153,6 +153,10 @@ type ContainerdConfig struct {
 
 // CniConfig contains toml config related to cni
 type CniConfig struct {
+	// DisableCNI disables the CNI plugin. When set to true, the CRI plugin will not
+	// setup or teardown the pod network using CNI. This is useful when using alternative
+	// network solutions that do not require CNI.
+	DisableCNI bool `toml:"disable_cni" json:"disableCNI"`
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	//
 	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
@@ -198,6 +202,61 @@ type CniConfig struct {
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
 	// UseInternalLoopback specifies if we use the CNI loopback plugin or internal mechanism to set lo to up
 	UseInternalLoopback bool `toml:"use_internal_loopback" json:"useInternalLoopback"`
+	// GRPCNetworkPluginAddress is the unix socket address of an external
+	// gRPC server implementing the PodNetwork service defined in
+	// networking.proto. When set, the gRPC plugin is used for pod network
+	// setup / teardown instead of CNI.
+	// Deprecated: Use GRPCNetworkPlugins for multi-server chaining support.
+	// When both are set, GRPCNetworkPlugins takes precedence.
+	GRPCNetworkPluginAddress string `toml:"grpc_network_plugin_address" json:"grpcNetworkPluginAddress"`
+	// GRPCNetworkPluginDialTimeout is how long (in seconds) to wait when
+	// dialing the gRPC network plugin at startup. Defaults to 5 seconds.
+	GRPCNetworkPluginDialTimeout int `toml:"grpc_network_plugin_dial_timeout" json:"grpcNetworkPluginDialTimeout"`
+	// GRPCNetworkPlugins is a list of external gRPC servers implementing
+	// the PodNetwork service. The plugins are called in order during
+	// setup and in reverse order during teardown (like CNI chaining).
+	// The first entry with primary=true (or the first entry if none is
+	// marked primary) is the primary plugin responsible for assigning
+	// the pod IP and creating the main network interface. Subsequent
+	// plugins receive the accumulated result from preceding plugins via
+	// prev_result so they can inspect or augment the network configuration.
+	GRPCNetworkPlugins []GRPCNetworkPluginEntry `toml:"grpc_network_plugins" json:"grpcNetworkPlugins"`
+	// GRPCNetworkPluginConfDir is a directory watched at runtime for gRPC
+	// network plugin registration files (*.json). Each JSON file describes
+	// a plugin with fields: name, address, primary, priority, dial_timeout.
+	// Plugins are discovered dynamically — adding or removing a file
+	// causes the chain to be rebuilt without restarting containerd.
+	//
+	// When set, this takes precedence over both GRPCNetworkPlugins and
+	// GRPCNetworkPluginAddress for dynamic plugin management.
+	// Static entries in GRPCNetworkPlugins are still used if this directory
+	// is empty.
+	GRPCNetworkPluginConfDir string `toml:"grpc_network_plugin_conf_dir" json:"grpcNetworkPluginConfDir"`
+	// GRPCNetworkManagementAddress is the unix socket address of an external
+	// gRPC server implementing the PodNetworkManagement service defined in
+	// networking.proto. This service provides extended operations such as
+	// GetPodIPs, MoveDevice, CreateNetdev, etc. It is optional — if not
+	// set, the management RPCs are not available.
+	GRPCNetworkManagementAddress string `toml:"grpc_network_management_address" json:"grpcNetworkManagementAddress"`
+	// GRPCNetworkManagementDialTimeout is how long (in seconds) to wait when
+	// dialing the management gRPC plugin at startup. Defaults to 5 seconds.
+	GRPCNetworkManagementDialTimeout int `toml:"grpc_network_management_dial_timeout" json:"grpcNetworkManagementDialTimeout"`
+}
+
+// GRPCNetworkPluginEntry describes a single external gRPC PodNetwork
+// server that participates in chained network setup / teardown.
+type GRPCNetworkPluginEntry struct {
+	// Name is a human-readable identifier for this plugin (used in logs).
+	Name string `toml:"name" json:"name"`
+	// Address is the unix socket address of the external PodNetwork gRPC server.
+	Address string `toml:"address" json:"address"`
+	// Primary marks this plugin as the primary network provider. The
+	// primary plugin is always called first during setup and last during
+	// teardown. If no plugin is marked primary, the first entry is used.
+	Primary bool `toml:"primary" json:"primary"`
+	// DialTimeout is how long (in seconds) to wait when dialing this
+	// plugin at startup. Defaults to 5 seconds.
+	DialTimeout int `toml:"dial_timeout" json:"dialTimeout"`
 }
 
 // Mirror contains the config related to the registry mirror

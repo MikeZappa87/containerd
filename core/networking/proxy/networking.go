@@ -32,14 +32,14 @@ import (
 
 // remotePodResourcesClient is a gRPC-backed implementation of networking.PodResourcesClient.
 type remotePodResourcesClient struct {
-	client api.PodNetworkClient
+	client api.PodNetworkManagementClient
 }
 
 // NewPodResourcesClient creates a new PodResourcesClient backed by the given
 // gRPC connection. This is the primary entry point for external consumers.
 func NewPodResourcesClient(conn grpc.ClientConnInterface) networking.PodResourcesClient {
 	return &remotePodResourcesClient{
-		client: api.NewPodNetworkClient(conn),
+		client: api.NewPodNetworkManagementClient(conn),
 	}
 }
 
@@ -231,10 +231,12 @@ func (r *remotePodResourcesClient) ApplyRule(ctx context.Context, sandboxID stri
 // CreateNetdev creates a new network device inside the pod sandbox's network namespace.
 func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error) {
 	apiReq := &api.CreateNetdevRequest{
-		SandboxId: req.SandboxID,
-		Name:      req.Name,
-		Mtu:       req.MTU,
-		Addresses: req.Addresses,
+		SandboxId:   req.SandboxID,
+		Name:        req.Name,
+		Mtu:         req.MTU,
+		Addresses:   req.Addresses,
+		HostNetwork: req.HostNetwork,
+		Master:      req.Master,
 	}
 
 	switch {
@@ -243,6 +245,7 @@ func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req network
 			Veth: &api.VethConfig{
 				PeerName:      req.Veth.PeerName,
 				PeerNetnsPath: req.Veth.PeerNetNSPath,
+				PeerMaster:    req.Veth.PeerMaster,
 			},
 		}
 	case req.Vxlan != nil:
@@ -275,6 +278,15 @@ func (r *remotePodResourcesClient) CreateNetdev(ctx context.Context, req network
 				Parent:     req.Macvlan.Parent,
 				Mode:       api.MacvlanMode(req.Macvlan.Mode),
 				MacAddress: req.Macvlan.MACAddress,
+			},
+		}
+	case req.Bridge != nil:
+		apiReq.Config = &api.CreateNetdevRequest_Bridge{
+			Bridge: &api.BridgeConfig{
+				StpEnabled:    req.Bridge.STPEnabled,
+				VlanFiltering: req.Bridge.VLANFiltering,
+				ForwardDelay:  req.Bridge.ForwardDelay,
+				DefaultPvid:   req.Bridge.DefaultPVID,
 			},
 		}
 	}
@@ -310,4 +322,18 @@ func apiToNetworkInterface(iface *api.NetworkInterface) networking.NetworkInterf
 		State:      iface.State,
 		Addresses:  iface.Addresses,
 	}
+}
+
+// AttachInterface attaches an existing interface to a master device (e.g. a Linux bridge).
+func (r *remotePodResourcesClient) AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error {
+	_, err := r.client.AttachInterface(ctx, &api.AttachInterfaceRequest{
+		SandboxId:     sandboxID,
+		InterfaceName: interfaceName,
+		Master:        master,
+		HostNetwork:   hostNetwork,
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
 }

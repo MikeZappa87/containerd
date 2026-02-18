@@ -96,12 +96,17 @@ const (
 	NetdevDummy                     // dummy interface
 	NetdevIPVlan                    // IP-VLAN subordinate device
 	NetdevMacvlan                   // MAC-VLAN subordinate device
+	NetdevBridge                    // Linux bridge
 )
 
 // VethConfig holds parameters for creating a veth pair.
 type VethConfig struct {
 	PeerName      string
 	PeerNetNSPath string
+	// PeerMaster is the optional master (bridge) device to attach the
+	// host-side peer end to. For example, setting this to "br0" enslaves
+	// the veth peer to the bridge.
+	PeerMaster string
 }
 
 // VxlanConfig holds parameters for creating a VXLAN device.
@@ -161,12 +166,34 @@ type MacvlanConfig struct {
 	MACAddress string
 }
 
-// CreateNetdevRequest describes a network device to create inside a pod netns.
+// BridgeConfig holds parameters for creating a Linux bridge device.
+type BridgeConfig struct {
+	// STPEnabled enables Spanning Tree Protocol.
+	STPEnabled bool
+	// VLANFiltering enables VLAN filtering on the bridge.
+	VLANFiltering bool
+	// ForwardDelay is the forward delay in centiseconds (kernel default 1500).
+	ForwardDelay uint32
+	// DefaultPVID is the default port VLAN ID for untagged traffic (default 1).
+	DefaultPVID uint32
+}
+
+// CreateNetdevRequest describes a network device to create.
 type CreateNetdevRequest struct {
 	SandboxID string
 	Name      string
 	MTU       uint32
 	Addresses []string
+
+	// HostNetwork, when true, creates the device in the host (root)
+	// network namespace instead of the pod's netns. This is necessary
+	// for infrastructure devices like bridges and vxlan tunnel endpoints.
+	HostNetwork bool
+
+	// Master is the optional master (bridge) device to attach this device
+	// to after creation. Both the new device and the master must be in
+	// the same namespace.
+	Master string
 
 	// Exactly one of the following config fields must be non-nil.
 	Veth    *VethConfig
@@ -174,6 +201,7 @@ type CreateNetdevRequest struct {
 	Dummy   *DummyConfig
 	IPVlan  *IPVlanConfig
 	Macvlan *MacvlanConfig
+	Bridge  *BridgeConfig
 }
 
 // CreateNetdevResult holds the result of creating a netdev inside a pod netns.
@@ -204,6 +232,89 @@ type PodResourcesClient interface {
 	// When hostNetwork is true, the rule is applied in the host (root)
 	// network namespace instead.
 	ApplyRule(ctx context.Context, sandboxID string, rule RoutingRule, hostNetwork bool) error
-	// CreateNetdev creates a new network device inside the pod sandbox's network namespace.
+	// CreateNetdev creates a new network device inside the pod sandbox's
+	// network namespace (or in the host namespace when HostNetwork is set).
 	CreateNetdev(ctx context.Context, req CreateNetdevRequest) (*CreateNetdevResult, error)
+	// AttachInterface attaches an existing interface to a master device
+	// (e.g. a Linux bridge). Both devices must be in the same network
+	// namespace.
+	AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error
+}
+
+// PortMapping describes a port mapping for a pod sandbox.
+type PortMapping struct {
+	Protocol      string
+	ContainerPort uint32
+	HostPort      uint32
+	HostIP        string
+}
+
+// DNSConfig holds DNS configuration for a pod.
+type DNSConfig struct {
+	Servers  []string
+	Searches []string
+	Options  []string
+}
+
+// SetupPodNetworkRequest holds all information needed to set up networking
+// for a pod sandbox. It replaces the CNI ADD invocation.
+type SetupPodNetworkRequest struct {
+	SandboxID    string
+	NetNSPath    string
+	PodName      string
+	PodNamespace string
+	PodUID       string
+	Annotations  map[string]string
+	Labels       map[string]string
+	PortMappings []PortMapping
+	DNS          *DNSConfig
+	CgroupParent string
+	// PrevResult is the result from the previous plugin in a chain.
+	// The primary (first) plugin receives this as nil. Subsequent
+	// chained plugins receive the accumulated result from all
+	// preceding plugins so they can inspect or augment it.
+	PrevResult *SetupPodNetworkResult
+}
+
+// SetupPodNetworkResult holds the result of setting up pod networking.
+type SetupPodNetworkResult struct {
+	Interfaces []NetworkInterface
+	Routes     []Route
+	DNS        *DNSConfig
+}
+
+// TeardownPodNetworkRequest holds all information needed to tear down
+// networking for a pod sandbox. It replaces the CNI DEL invocation.
+type TeardownPodNetworkRequest struct {
+	SandboxID    string
+	NetNSPath    string
+	PodName      string
+	PodNamespace string
+	PodUID       string
+	Annotations  map[string]string
+	Labels       map[string]string
+	PortMappings []PortMapping
+	CgroupParent string
+	// PrevResult is the final network result from the setup phase.
+	// This allows teardown plugins to know what interfaces, IPs,
+	// and routes were configured so they can clean up appropriately.
+	PrevResult *SetupPodNetworkResult
+}
+
+// PodNetworkPlugin is the interface that replaces the CNI plugin for
+// pod-level network setup and teardown. It is backed by a gRPC client
+// that calls an external PodNetwork service.
+type PodNetworkPlugin interface {
+	// SetupPodNetwork configures the network for a pod sandbox.
+	SetupPodNetwork(ctx context.Context, req SetupPodNetworkRequest) (*SetupPodNetworkResult, error)
+	// TeardownPodNetwork removes the network configuration for a pod sandbox.
+	TeardownPodNetwork(ctx context.Context, req TeardownPodNetworkRequest) error
+	// Status returns nil when the plugin is ready to accept requests.
+	Status() error
+	// CheckHealth performs a live health check against the network plugin.
+	// It verifies both that the plugin's socket exists and that the
+	// gRPC server is responsive by calling the CheckHealth RPC.
+	CheckHealth(ctx context.Context) error
+	// Close releases any resources held by the plugin.
+	Close() error
 }

@@ -28,6 +28,11 @@ const windowsNetworkAttachCount = 1
 
 // initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
+	// Skip CNI initialization if CNI is disabled.
+	if c.config.DisableCNI {
+		return nil
+	}
+
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
 	}

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"path/filepath"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/networking"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/bandwidth"
@@ -407,12 +409,9 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}()
 
 	var (
-		id        = sandbox.ID
-		config    = sandbox.Config
-		path      = sandbox.NetNSPath
-		netPlugin = c.getNetworkPlugin(sandbox.RuntimeHandler)
-		err       error
-		result    *cni.Result
+		id     = sandbox.ID
+		config = sandbox.Config
+		path   = sandbox.NetNSPath
 	)
 
 	// Add tracing attributes
@@ -420,6 +419,20 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("netns.path", path),
 		tracing.Attribute("runtime.handler", sandbox.RuntimeHandler),
+	)
+
+	// When CNI is disabled, delegate to the gRPC network plugin.
+	if c.config.DisableCNI {
+		if c.grpcNetPlugin != nil {
+			return c.setupPodNetworkGRPC(ctx, span, sandbox)
+		}
+		return errors.New("CNI is disabled but no gRPC network plugin is configured")
+	}
+
+	var (
+		netPlugin = c.getNetworkPlugin(sandbox.RuntimeHandler)
+		err       error
+		result    *cni.Result
 	)
 
 	if netPlugin == nil {
@@ -466,6 +479,122 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return nil
 	}
 	return fmt.Errorf("failed to find network info for sandbox %q", id)
+}
+
+// setupPodNetworkGRPC uses the gRPC PodNetwork plugin to configure
+// networking for the sandbox, replacing CNI.
+func (c *criService) setupPodNetworkGRPC(ctx context.Context, span *tracing.Span, sandbox *sandboxstore.Sandbox) error {
+	var (
+		id     = sandbox.ID
+		config = sandbox.Config
+		path   = sandbox.NetNSPath
+		meta   = config.GetMetadata()
+	)
+
+	if c.config.UseInternalLoopback {
+		if err := c.bringUpLoopback(path); err != nil {
+			return fmt.Errorf("unable to set lo to up: %w", err)
+		}
+	}
+
+	// Build the gRPC request from the pod sandbox config.
+	req := networking.SetupPodNetworkRequest{
+		SandboxID:    id,
+		NetNSPath:    path,
+		PodName:      meta.GetName(),
+		PodNamespace: meta.GetNamespace(),
+		PodUID:       meta.GetUid(),
+		Annotations:  config.GetAnnotations(),
+		Labels:       config.GetLabels(),
+		CgroupParent: config.GetLinux().GetCgroupParent(),
+	}
+
+	for _, pm := range config.GetPortMappings() {
+		req.PortMappings = append(req.PortMappings, networking.PortMapping{
+			Protocol:      strings.ToLower(pm.Protocol.String()),
+			ContainerPort: uint32(pm.ContainerPort),
+			HostPort:      uint32(pm.HostPort),
+			HostIP:        pm.HostIp,
+		})
+	}
+
+	if dns := config.GetDnsConfig(); dns != nil {
+		req.DNS = &networking.DNSConfig{
+			Servers:  dns.GetServers(),
+			Searches: dns.GetSearches(),
+			Options:  dns.GetOptions(),
+		}
+	}
+
+	log.G(ctx).WithField("podsandboxid", id).Debugf("begin gRPC network setup")
+	netStart := time.Now()
+	span.AddEvent("grpc.network.setup.start")
+
+	result, err := c.grpcNetPlugin.SetupPodNetwork(ctx, req)
+	networkPluginOperations.WithValues(networkSetUpOp).Inc()
+	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
+	if err != nil {
+		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
+		return fmt.Errorf("gRPC network setup failed for sandbox %q: %w", id, err)
+	}
+	span.AddEvent("grpc.network.setup.complete")
+
+	// Extract IPs from the returned interfaces.
+	// Use the first interface with addresses as the primary.
+	var primaryIP string
+	var additionalIPs []string
+	for _, iface := range result.Interfaces {
+		for _, addr := range iface.Addresses {
+			ip, _, err := net.ParseCIDR(addr)
+			if err != nil {
+				// Try parsing as a plain IP.
+				ip = net.ParseIP(addr)
+			}
+			if ip == nil {
+				continue
+			}
+			if primaryIP == "" {
+				primaryIP = ip.String()
+			} else {
+				additionalIPs = append(additionalIPs, ip.String())
+			}
+		}
+	}
+
+	if primaryIP == "" {
+		return fmt.Errorf("gRPC network plugin returned no IP for sandbox %q", id)
+	}
+
+	sandbox.IP = primaryIP
+	sandbox.AdditionalIPs = additionalIPs
+	// Mark that the network was set up (CNIResult non-nil triggers teardown).
+	// We store a synthetic CNI result so existing teardown logic is triggered.
+	sandbox.CNIResult = &cni.Result{
+		Interfaces: make(map[string]*cni.Config),
+	}
+	for _, iface := range result.Interfaces {
+		cfg := &cni.Config{
+			Mac: iface.MACAddress,
+		}
+		for _, addr := range iface.Addresses {
+			ip, _, err := net.ParseCIDR(addr)
+			if err != nil {
+				ip = net.ParseIP(addr)
+			}
+			if ip != nil {
+				cfg.IPConfigs = append(cfg.IPConfigs, &cni.IPConfig{IP: ip})
+			}
+		}
+		sandbox.CNIResult.Interfaces[iface.Name] = cfg
+	}
+
+	span.SetAttributes(
+		tracing.Attribute("sandbox.ip", sandbox.IP),
+		tracing.Attribute("sandbox.additional_ips.count", len(sandbox.AdditionalIPs)),
+	)
+
+	log.G(ctx).WithField("podsandboxid", id).Debugf("gRPC network setup complete, ip=%s", primaryIP)
+	return nil
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.

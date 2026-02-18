@@ -26,6 +26,7 @@ import (
 	"sort"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -45,13 +46,26 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
-	// Check the status of the cni initialization
-	if netPlugin != nil {
-		if err := netPlugin.Status(); err != nil {
+	// Skip CNI status check if CNI is disabled
+	var netPlugin cni.CNI
+	if !c.config.DisableCNI {
+		netPlugin = c.netPlugin[defaultNetworkPlugin]
+		// Check the status of the cni initialization
+		if netPlugin != nil {
+			if err := netPlugin.Status(); err != nil {
+				networkCondition.Status = false
+				networkCondition.Reason = networkNotReadyReason
+				networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			}
+		}
+	} else if c.grpcNetPlugin != nil {
+		// When CNI is disabled we rely on the gRPC network plugin.
+		// Perform a live health check to verify the plugin socket
+		// exists and the server is responsive before reporting ready.
+		if err := c.grpcNetPlugin.CheckHealth(ctx); err != nil {
 			networkCondition.Status = false
 			networkCondition.Reason = networkNotReadyReason
-			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
+			networkCondition.Message = fmt.Sprintf("gRPC network plugin health check failed: %v", err)
 		}
 	}
 
@@ -105,6 +119,17 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			}
 		}
 		resp.Info["lastCNILoadStatus"] = defaultStatus
+
+		// Surface gRPC network plugin syncer status when using dynamic
+		// plugin discovery, so operators can see parse/load errors via
+		// "crictl info".
+		if c.grpcPluginSyncer != nil {
+			grpcStatus := "OK"
+			if err := c.grpcPluginSyncer.lastStatus(); err != nil {
+				grpcStatus = err.Error()
+			}
+			resp.Info["lastGRPCPluginLoadStatus"] = grpcStatus
+		}
 	}
 	intro, err := c.client.IntrospectionService().Server(ctx)
 	if err != nil {

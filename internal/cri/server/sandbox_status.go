@@ -110,6 +110,8 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		return "", nil, nil
 	}
 
+	// IPs are set during RunPodSandbox by either the CNI result or the
+	// gRPC SetupPodNetwork result and cached on the sandbox object.
 	return sandbox.IP, sandbox.AdditionalIPs, nil
 }
 

@@ -45,8 +45,11 @@ type PodResourcesProvider interface {
 	ApplyRoute(ctx context.Context, sandboxID string, route networking.Route, hostNetwork bool) error
 	// ApplyRule adds an ip rule in the sandbox's network namespace.
 	ApplyRule(ctx context.Context, sandboxID string, rule networking.RoutingRule, hostNetwork bool) error
-	// CreateNetdev creates a new network device inside the sandbox's network namespace.
+	// CreateNetdev creates a new network device inside the sandbox's network namespace
+	// (or in the host namespace when HostNetwork is set on the request).
 	CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error)
+	// AttachInterface attaches an existing interface to a master device (e.g. a bridge).
+	AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error
 }
 
 // GetPodResources returns the network namespace path for the sandbox identified by sandboxID.
