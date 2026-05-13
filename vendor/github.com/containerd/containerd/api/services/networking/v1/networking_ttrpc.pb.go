@@ -84,6 +84,7 @@ type TTRPCPodNetworkManagementService interface {
 	ApplyRoute(context.Context, *ApplyRouteRequest) (*ApplyRouteResponse, error)
 	ApplyRule(context.Context, *ApplyRuleRequest) (*ApplyRuleResponse, error)
 	CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error)
+	DeleteNetdev(context.Context, *DeleteNetdevRequest) (*DeleteNetdevResponse, error)
 	AttachInterface(context.Context, *AttachInterfaceRequest) (*AttachInterfaceResponse, error)
 }
 
@@ -145,6 +146,13 @@ func RegisterTTRPCPodNetworkManagementService(srv *ttrpc.Server, svc TTRPCPodNet
 					return nil, err
 				}
 				return svc.CreateNetdev(ctx, &req)
+			},
+			"DeleteNetdev": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req DeleteNetdevRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.DeleteNetdev(ctx, &req)
 			},
 			"AttachInterface": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req AttachInterfaceRequest
@@ -226,6 +234,14 @@ func (c *ttrpcpodnetworkmanagementClient) ApplyRule(ctx context.Context, req *Ap
 func (c *ttrpcpodnetworkmanagementClient) CreateNetdev(ctx context.Context, req *CreateNetdevRequest) (*CreateNetdevResponse, error) {
 	var resp CreateNetdevResponse
 	if err := c.client.Call(ctx, "containerd.services.networking.v1.PodNetworkManagement", "CreateNetdev", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcpodnetworkmanagementClient) DeleteNetdev(ctx context.Context, req *DeleteNetdevRequest) (*DeleteNetdevResponse, error) {
+	var resp DeleteNetdevResponse
+	if err := c.client.Call(ctx, "containerd.services.networking.v1.PodNetworkManagement", "DeleteNetdev", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

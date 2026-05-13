@@ -87,6 +87,12 @@ service PodNetworkManagement {
 	// Supports veth, vxlan, dummy, bridge, ipvlan, and macvlan types.
 	rpc CreateNetdev(CreateNetdevRequest) returns (CreateNetdevResponse);
 
+	// DeleteNetdev deletes an existing Linux network device. By default
+	// the device is deleted from inside the pod sandbox's network namespace.
+	// When host_network is true, it is deleted from the host (root)
+	// namespace instead.
+	rpc DeleteNetdev(DeleteNetdevRequest) returns (DeleteNetdevResponse);
+
 	// AttachInterface attaches an existing interface to a master device
 	// (e.g. a Linux bridge). Both devices must be in the same network
 	// namespace. This is used, for example, to enslave a vxlan or veth
@@ -569,6 +575,25 @@ message CreateNetdevResponse {
 	// For veth: the peer interface info (in whichever namespace it lives).
 	NetworkInterface peer_interface = 2;
 }
+
+// ———————————————————————————————————————————————
+// DeleteNetdev
+// ———————————————————————————————————————————————
+
+message DeleteNetdevRequest {
+	// Sandbox identifier. Used to resolve the pod netns when
+	// host_network is false.
+	string sandbox_id = 1;
+
+	// Name of the device to delete (e.g. "dummy0", "vxlan100").
+	string name = 2;
+
+	// When true, the device is deleted from the host (root) network
+	// namespace instead of the pod's netns. Defaults to false (pod netns).
+	bool host_network = 3;
+}
+
+message DeleteNetdevResponse {}
 
 // ———————————————————————————————————————————————
 // AttachInterface

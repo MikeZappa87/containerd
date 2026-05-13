@@ -13,14 +13,15 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/go:1": {
 			"version": "1.24.11"
-		}
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+			"helm": "none",
+			"minikube": "none"
+		},
+		"ghcr.io/devcontainers-extra/features/kind:1": {}
 	},
 
 	"onCreateCommand": "sudo PATH=$PATH bash .devcontainer/setup.sh",
-	"postAttachCommand": {
-		"Runs all non-integration tests that do not require `root` privileges": "make test",
-		"Runs non-integration tests which require `root`": "sudo PATH=$PATH  make root-test"
-	},
 
 	"remoteUser": "root",
 	"runArgs": [

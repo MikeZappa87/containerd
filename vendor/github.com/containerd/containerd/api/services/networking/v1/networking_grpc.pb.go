@@ -235,6 +235,8 @@ type PodNetworkManagementClient interface {
 	// namespace instead (useful for bridges and overlay endpoints).
 	// Supports veth, vxlan, dummy, bridge, ipvlan, and macvlan types.
 	CreateNetdev(ctx context.Context, in *CreateNetdevRequest, opts ...grpc.CallOption) (*CreateNetdevResponse, error)
+	// DeleteNetdev deletes an existing Linux network device.
+	DeleteNetdev(ctx context.Context, in *DeleteNetdevRequest, opts ...grpc.CallOption) (*DeleteNetdevResponse, error)
 	// AttachInterface attaches an existing interface to a master device
 	// (e.g. a Linux bridge). Both devices must be in the same network
 	// namespace. This is used, for example, to enslave a vxlan or veth
@@ -322,6 +324,15 @@ func (c *podNetworkManagementClient) CreateNetdev(ctx context.Context, in *Creat
 	return out, nil
 }
 
+func (c *podNetworkManagementClient) DeleteNetdev(ctx context.Context, in *DeleteNetdevRequest, opts ...grpc.CallOption) (*DeleteNetdevResponse, error) {
+	out := new(DeleteNetdevResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetworkManagement/DeleteNetdev", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *podNetworkManagementClient) AttachInterface(ctx context.Context, in *AttachInterfaceRequest, opts ...grpc.CallOption) (*AttachInterfaceResponse, error) {
 	out := new(AttachInterfaceResponse)
 	err := c.cc.Invoke(ctx, "/containerd.services.networking.v1.PodNetworkManagement/AttachInterface", in, out, opts...)
@@ -360,6 +371,8 @@ type PodNetworkManagementServer interface {
 	// namespace instead (useful for bridges and overlay endpoints).
 	// Supports veth, vxlan, dummy, bridge, ipvlan, and macvlan types.
 	CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error)
+	// DeleteNetdev deletes an existing Linux network device.
+	DeleteNetdev(context.Context, *DeleteNetdevRequest) (*DeleteNetdevResponse, error)
 	// AttachInterface attaches an existing interface to a master device
 	// (e.g. a Linux bridge). Both devices must be in the same network
 	// namespace. This is used, for example, to enslave a vxlan or veth
@@ -395,6 +408,9 @@ func (UnimplementedPodNetworkManagementServer) ApplyRule(context.Context, *Apply
 }
 func (UnimplementedPodNetworkManagementServer) CreateNetdev(context.Context, *CreateNetdevRequest) (*CreateNetdevResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNetdev not implemented")
+}
+func (UnimplementedPodNetworkManagementServer) DeleteNetdev(context.Context, *DeleteNetdevRequest) (*DeleteNetdevResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteNetdev not implemented")
 }
 func (UnimplementedPodNetworkManagementServer) AttachInterface(context.Context, *AttachInterfaceRequest) (*AttachInterfaceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AttachInterface not implemented")
@@ -556,6 +572,24 @@ func _PodNetworkManagement_CreateNetdev_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PodNetworkManagement_DeleteNetdev_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteNetdevRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PodNetworkManagementServer).DeleteNetdev(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.networking.v1.PodNetworkManagement/DeleteNetdev",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PodNetworkManagementServer).DeleteNetdev(ctx, req.(*DeleteNetdevRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PodNetworkManagement_AttachInterface_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AttachInterfaceRequest)
 	if err := dec(in); err != nil {
@@ -612,6 +646,10 @@ var PodNetworkManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateNetdev",
 			Handler:    _PodNetworkManagement_CreateNetdev_Handler,
+		},
+		{
+			MethodName: "DeleteNetdev",
+			Handler:    _PodNetworkManagement_DeleteNetdev_Handler,
 		},
 		{
 			MethodName: "AttachInterface",

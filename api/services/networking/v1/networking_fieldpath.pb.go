@@ -32,11 +32,11 @@ func (m *DNSConfig) Field(fieldpath []string) (string, bool) {
 	}
 	switch fieldpath[0] {
 	case "servers":
-		return string(m.Servers), len(m.Servers) > 0
+		return strings.Join(m.Servers, ","), len(m.Servers) > 0
 	case "searches":
-		return string(m.Searches), len(m.Searches) > 0
+		return strings.Join(m.Searches, ","), len(m.Searches) > 0
 	case "options":
-		return string(m.Options), len(m.Options) > 0
+		return strings.Join(m.Options, ","), len(m.Options) > 0
 	}
 	return "", false
 }
@@ -217,7 +217,7 @@ func (m *PodInterfaceIPs) Field(fieldpath []string) (string, bool) {
 	}
 	switch fieldpath[0] {
 	case "ips":
-		return string(m.Ips), len(m.Ips) > 0
+		return strings.Join(m.Ips, ","), len(m.Ips) > 0
 	}
 	return "", false
 }
@@ -276,7 +276,7 @@ func (m *NetworkInterface) Field(fieldpath []string) (string, bool) {
 	case "state":
 		return string(m.State), len(m.State) > 0
 	case "addresses":
-		return string(m.Addresses), len(m.Addresses) > 0
+		return strings.Join(m.Addresses, ","), len(m.Addresses) > 0
 	}
 	return "", false
 }
@@ -362,7 +362,7 @@ func (m *MoveDeviceResponse) Field(fieldpath []string) (string, bool) {
 	case "device_name":
 		return string(m.DeviceName), len(m.DeviceName) > 0
 	case "addresses":
-		return string(m.Addresses), len(m.Addresses) > 0
+		return strings.Join(m.Addresses, ","), len(m.Addresses) > 0
 	}
 	return "", false
 }
@@ -560,7 +560,7 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 	case "name":
 		return string(m.Name), len(m.Name) > 0
 	case "addresses":
-		return string(m.Addresses), len(m.Addresses) > 0
+		return strings.Join(m.Addresses, ","), len(m.Addresses) > 0
 	case "host_network":
 		return fmt.Sprint(m.HostNetwork), true
 	case "master":
@@ -572,10 +572,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Veth == nil {
+		if m.GetVeth() == nil {
 			return "", false
 		}
-		return m.Veth.Field(fieldpath[1:])
+		return m.GetVeth().Field(fieldpath[1:])
 	case "vxlan":
 		// NOTE(stevvooe): This is probably not correct in many cases.
 		// We assume that the target message also implements the Field
@@ -583,10 +583,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Vxlan == nil {
+		if m.GetVxlan() == nil {
 			return "", false
 		}
-		return m.Vxlan.Field(fieldpath[1:])
+		return m.GetVxlan().Field(fieldpath[1:])
 	case "dummy":
 		// NOTE(stevvooe): This is probably not correct in many cases.
 		// We assume that the target message also implements the Field
@@ -594,10 +594,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Dummy == nil {
+		if m.GetDummy() == nil {
 			return "", false
 		}
-		return m.Dummy.Field(fieldpath[1:])
+		return m.GetDummy().Field(fieldpath[1:])
 	case "ipvlan":
 		// NOTE(stevvooe): This is probably not correct in many cases.
 		// We assume that the target message also implements the Field
@@ -605,10 +605,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Ipvlan == nil {
+		if m.GetIpvlan() == nil {
 			return "", false
 		}
-		return m.Ipvlan.Field(fieldpath[1:])
+		return m.GetIpvlan().Field(fieldpath[1:])
 	case "macvlan":
 		// NOTE(stevvooe): This is probably not correct in many cases.
 		// We assume that the target message also implements the Field
@@ -616,10 +616,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Macvlan == nil {
+		if m.GetMacvlan() == nil {
 			return "", false
 		}
-		return m.Macvlan.Field(fieldpath[1:])
+		return m.GetMacvlan().Field(fieldpath[1:])
 	case "bridge":
 		// NOTE(stevvooe): This is probably not correct in many cases.
 		// We assume that the target message also implements the Field
@@ -627,10 +627,10 @@ func (m *CreateNetdevRequest) Field(fieldpath []string) (string, bool) {
 		//
 		// If you have a broken build and have found this comment,
 		// you may be closer to a solution.
-		if m.Bridge == nil {
+		if m.GetBridge() == nil {
 			return "", false
 		}
-		return m.Bridge.Field(fieldpath[1:])
+		return m.GetBridge().Field(fieldpath[1:])
 	}
 	return "", false
 }

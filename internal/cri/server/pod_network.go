@@ -1243,6 +1243,31 @@ func enslaveToMaster(link netlink.Link, masterName string) error {
 // AttachInterface attaches an existing interface to a master device (e.g. a
 // Linux bridge). When hostNetwork is true the operation is performed in the
 // host (root) network namespace; otherwise it targets the pod's netns.
+func (c *criService) DeleteNetdev(ctx context.Context, sandboxID string, name string, hostNetwork bool) error {
+	sb, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to find sandbox %q: %w", sandboxID, err)
+	}
+	if !hostNetwork && sb.NetNSPath == "" {
+		return fmt.Errorf("sandbox %q has no network namespace", sandboxID)
+	}
+
+	del := func() error {
+		link, err := netlink.LinkByName(name)
+		if err != nil {
+			return fmt.Errorf("interface %q not found: %w", name, err)
+		}
+		return netlink.LinkDel(link)
+	}
+
+	if hostNetwork {
+		return del()
+	}
+	return cnins.WithNetNSPath(sb.NetNSPath, func(_ cnins.NetNS) error {
+		return del()
+	})
+}
+
 func (c *criService) AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error {
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {

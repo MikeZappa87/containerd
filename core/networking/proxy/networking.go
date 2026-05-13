@@ -337,3 +337,16 @@ func (r *remotePodResourcesClient) AttachInterface(ctx context.Context, sandboxI
 	}
 	return nil
 }
+
+// DeleteNetdev deletes an existing network device from the pod sandbox's network namespace.
+func (r *remotePodResourcesClient) DeleteNetdev(ctx context.Context, sandboxID string, name string, hostNetwork bool) error {
+	_, err := r.client.DeleteNetdev(ctx, &api.DeleteNetdevRequest{
+		SandboxId:   sandboxID,
+		Name:        name,
+		HostNetwork: hostNetwork,
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}

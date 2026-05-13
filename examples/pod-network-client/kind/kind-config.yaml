@@ -1,0 +1,10 @@
+# Kind cluster configuration for testing the pod networking API.
+#
+# Creates a single control-plane node and one worker, both using
+# the custom node image with our containerd build and the
+# pod-network-client binary baked in.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker

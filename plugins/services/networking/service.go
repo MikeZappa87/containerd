@@ -496,6 +496,17 @@ func networkInterfaceToAPI(iface corenetworking.NetworkInterface) *api.NetworkIn
 	}
 }
 
+// DeleteNetdev deletes an existing network device from the sandbox's network namespace.
+func (s *podService) DeleteNetdev(ctx context.Context, req *api.DeleteNetdevRequest) (*api.DeleteNetdevResponse, error) {
+	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("name", req.Name).Debug("delete netdev")
+
+	if err := s.provider.DeleteNetdev(ctx, req.SandboxId, req.Name, req.HostNetwork); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &api.DeleteNetdevResponse{}, nil
+}
+
 // AttachInterface attaches an existing interface to a master device.
 func (s *podService) AttachInterface(ctx context.Context, req *api.AttachInterfaceRequest) (*api.AttachInterfaceResponse, error) {
 	log.G(ctx).WithField("sandbox_id", req.SandboxId).WithField("interface", req.InterfaceName).WithField("master", req.Master).Debug("attach interface")

@@ -48,6 +48,9 @@ type PodResourcesProvider interface {
 	// CreateNetdev creates a new network device inside the sandbox's network namespace
 	// (or in the host namespace when HostNetwork is set on the request).
 	CreateNetdev(ctx context.Context, req networking.CreateNetdevRequest) (*networking.CreateNetdevResult, error)
+	// DeleteNetdev deletes an existing network device from the sandbox's network namespace
+	// (or from the host namespace when hostNetwork is true).
+	DeleteNetdev(ctx context.Context, sandboxID string, name string, hostNetwork bool) error
 	// AttachInterface attaches an existing interface to a master device (e.g. a bridge).
 	AttachInterface(ctx context.Context, sandboxID string, interfaceName string, master string, hostNetwork bool) error
 }
