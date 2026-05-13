@@ -76,7 +76,6 @@ func (a *API) Register() error {
 	return a.nri.Start()
 }
 
-//
 // CRI-NRI lifecycle hook interface
 //
 // These functions are used to hook NRI into the processing of
@@ -84,20 +83,35 @@ func (a *API) Register() error {
 // interface.
 //
 
+// RunPodSandbox invokes the NRI RunPodSandbox hook for the given sandbox.
+// If a plugin returns pod IPs in the response, they are written back to
+// criPod: the first IP becomes criPod.IP, the rest become criPod.AdditionalIPs.
+// On error the sandbox is stopped and removed in NRI, and any returned IPs
+// are discarded.
 func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 	if a.IsDisabled() {
 		return nil
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	err := a.nri.RunPodSandbox(ctx, pod)
+	nriRsp, err := a.nri.RunPodSandbox(ctx, pod)
 
 	if err != nil {
 		a.nri.StopPodSandbox(ctx, pod)
 		a.nri.RemovePodSandbox(ctx, pod)
+		return err
 	}
 
-	return err
+	if nriRsp != nil && len(nriRsp.Ips) > 0 {
+		if criPod.IP != "" && criPod.IP != nriRsp.Ips[0] {
+			log.G(ctx).Warnf("NRI plugin overriding CNI-assigned pod IP %q with %q",
+				criPod.IP, nriRsp.Ips[0])
+		}
+		criPod.IP = nriRsp.Ips[0]
+		criPod.AdditionalIPs = nriRsp.Ips[1:]
+	}
+
+	return nil
 }
 
 func (a *API) UpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox, overhead *cri.LinuxContainerResources, req *cri.LinuxContainerResources) error {
