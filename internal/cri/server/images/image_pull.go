@@ -102,15 +102,9 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 
 	imageRef := r.GetImage().GetImage()
 
-	credentials := func(host string) (string, string, error) {
-		hostauth := r.GetAuth()
-		if hostauth == nil {
-			config := c.config.Registry.Configs[host]
-			if config.Auth != nil {
-				hostauth = toRuntimeAuthConfig(*config.Auth)
-			}
-		}
-		return ParseAuth(hostauth, host)
+	credentials, err := c.credentialsForRef(imageRef, r.GetAuth())
+	if err != nil {
+		return nil, err
 	}
 
 	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, r.SandboxConfig, r.GetImage().GetRuntimeHandler())
@@ -118,6 +112,71 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		return nil, err
 	}
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
+}
+
+// credentialsForRef builds a per-host credentials function for a PullImage call.
+//
+// Auth from the CRI PullImageRequest takes precedence over the node-wide
+// Registry.Configs so that a pod's imagePullSecrets are not shadowed by static
+// node configuration. It is only offered to the registry named by the image
+// reference, so credentials for one registry are not disclosed to unrelated
+// mirror endpoints, unless the client scoped them explicitly with
+// ServerAddress or the operator set allow_request_auth_on_mirrors.
+//
+// An unparseable ref is an error: without a parsed registry there is nothing to
+// anchor the disclosure decision to, and handing a pod's imagePullSecrets to
+// hosts chosen on that basis is exactly what this function exists to prevent.
+func (c *CRIImageService) credentialsForRef(ref string, reqAuth *runtime.AuthConfig) (func(string) (string, string, error), error) {
+	namedRef, err := distribution.ParseDockerRef(ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image reference %q: %w", ref, err)
+	}
+	refDomain := distribution.Domain(namedRef)
+	refHost, _ := docker.DefaultHost(refDomain)
+
+	// Hosts are compared after DefaultHost so that a client naming "docker.io"
+	// matches the "registry-1.docker.io" the resolver invokes the callback with.
+	scoped := reqAuth.GetServerAddress() != ""
+	var scopedHost string
+	if scoped {
+		u, perr := url.Parse(reqAuth.GetServerAddress())
+		if perr != nil {
+			return nil, fmt.Errorf("parse server address: %w", perr)
+		}
+		scopedHost, _ = docker.DefaultHost(u.Host)
+	}
+
+	// ServerAddress is dropped because the gate below enforces it, with the
+	// normalization ParseAuth lacks. What remains does not depend on the host,
+	// so it is resolved once rather than per candidate host.
+	reqUser, reqSecret, err := ParseAuth(&runtime.AuthConfig{
+		Username:      reqAuth.GetUsername(),
+		Password:      reqAuth.GetPassword(),
+		Auth:          reqAuth.GetAuth(),
+		IdentityToken: reqAuth.GetIdentityToken(),
+	}, "")
+	if err != nil {
+		return nil, err
+	}
+	hasReqAuth := reqUser != "" || reqSecret != ""
+	allowOnMirrors := c.config.Registry.AllowRequestAuthOnMirrors
+
+	return func(host string) (string, string, error) {
+		offer := host == refDomain || host == refHost || allowOnMirrors
+		if scoped {
+			// A ServerAddress is authoritative in both directions: it grants
+			// the host it names regardless of allow_request_auth_on_mirrors,
+			// and withholds from every other host.
+			offer = host == scopedHost
+		}
+		if hasReqAuth && offer {
+			return reqUser, reqSecret, nil
+		}
+		if cfg := c.config.Registry.Configs[host]; cfg.Auth != nil {
+			return ParseAuth(toRuntimeAuthConfig(*cfg.Auth), host)
+		}
+		return "", "", nil
+	}, nil
 }
 
 func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
