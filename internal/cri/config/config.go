@@ -254,6 +254,20 @@ type Registry struct {
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
+	// ForwardRequestAuthToMirrors makes the auth from a CRI PullImageRequest
+	// (e.g. a pod's imagePullSecrets) reach every host the resolver contacts,
+	// including mirrors, rather than only the registry the image reference
+	// itself points at.
+	//
+	// By default containerd withholds the request auth from mirror hosts, so
+	// a pull secret for one registry is not disclosed to a mirror configured
+	// for an unrelated one. Deployments that front a registry with a
+	// pull-through cache and expect the pod's pull secret to authenticate
+	// against that cache need this option to keep working.
+	//
+	// Enable it only when every configured mirror is trusted to see the same
+	// credentials as the upstream registry.
+	ForwardRequestAuthToMirrors bool `toml:"forward_request_auth_to_mirrors" json:"forwardRequestAuthToMirrors"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.
